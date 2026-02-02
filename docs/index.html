@@ -1,0 +1,238 @@
+
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>US DM Dashboard</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }
+            h1 {
+                color: #333;
+                display: flex;
+                align-items: baseline;
+                gap: 12px;
+            }
+            .date-subtitle {
+                margin-top: 6px;
+                font-size: 0.95em;
+                color: #333;
+                margin-bottom: 12px;
+            }
+            .fg-box {
+                background-color: #ffc107;
+                color: white;
+                padding: 10px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+                display: inline-block;
+            }
+            .summary-table {
+                border-collapse: collapse;
+                margin: 20px 0;
+                width: 100%; /* full width on mobile by default */
+            }
+            .summary-table th,
+            .summary-table td {
+                border: 1px solid #ccc;
+                padding: 6px 10px;
+                text-align: center;
+            }
+            .summary-table th {
+                background-color: #f0f0f0;
+            }
+            .row {
+                display: flex;
+                flex-direction: column;  /* default mobile = stacked */
+                margin-bottom: 30px;
+            }
+            .column {
+                flex: 1;
+                margin: 10px 0;
+                width: 100%;
+            }
+            .column table {
+                width: 100% !important;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 1.1em;
+                display: block;
+                white-space: normal;
+            }
+            table tbody {
+                display: table;
+                width: 100%;
+            }
+            th, td {
+                border: 1px solid #ccc;
+                padding: 6px 6px;       /* tighter cells for mobile */
+                text-align: left;
+            }
+            th {
+                background-color: #f0f0f0;
+            }
+            table, th, td {
+                font-size: 1.1em;
+                line-height: 1.5;
+                -webkit-text-size-adjust: 100%;
+            }
+            .sector-grid {
+                display: flex;
+                flex-wrap: wrap;
+                margin-bottom: 30px;
+                width: 100%;
+            }
+            .sector-cell {
+                border: 1px solid #ccc;
+                padding: 12px 14px;
+                text-align: center;
+                word-wrap: break-word;
+                font-weight: bold;
+                flex: 0 0 33.33%;   /* 3 columns on mobile/tablet */
+                box-sizing: border-box;
+            }
+            .sortable th {
+                background-color: #f0f0f0;
+                cursor: pointer;
+                color: #007bff;
+                text-decoration: underline;
+            }
+            .sortable th:hover {
+                color: #0056b3;
+            }
+            .sortable th.asc::after {
+                content: " ▲";
+                font-size: 0.9em;
+                color: #333;
+            }
+            .sortable th.desc::after {
+                content: " ▼";
+                font-size: 0.9em;
+                color: #333;
+            }
+            /* Desktop overrides for larger screens */
+            @media (min-width: 64em) {   /* ~1024px if base font size = 16px */
+                .row {
+                    flex-direction: row;   /* side-by-side columns */
+                }
+                .column {
+                    margin: 0 10px;
+                }
+                table, th, td {
+                    font-size: 1.1em;        /* normal size */
+                    line-height: 1.5;
+                    white-space: normal;
+                }
+                .summary-table {
+                    width: 60%;            /* narrower summary table */
+                }
+                .sector-cell {
+                    flex: 0 0 16.66%;      /* 6 columns on wide screens */
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="refresh-indicator" id="refreshTimer">Page loaded at <span id="loadTime"></span></div>
+        <h1>📈 US DM Dashboard 📉 </h1>
+        <div class="date-subtitle">Signals triggered on Friday, Jan 30, 2026 (as of NY market close)</div>
+        <div class="fg-box">
+            <strong>CNN Fear & Greed Index:</strong> 58 (Prev: 62) on 2026-01-30
+        </div>
+        <img src="fg_trend.png" alt="Fear & Greed Trend" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
+
+        <h2>Signal Summary</h2>
+        <table class="summary-table">
+            <tr>
+                <th>Totals</th>
+                <th>Daily</th>
+                <th>Weekly</th>
+            </tr>
+            <tr>
+                <td><strong>Bottoms</strong></td>
+                <td>56</td>
+                <td>18</td>
+            </tr>
+            <tr>
+                <td><strong>Tops</strong></td>
+                <td>31</td>
+                <td>122</td>
+            </tr>
+        </table>
+    <h2>Sector Signal Grid</h2><div class="sector-grid"><div class="sector-cell" style="background-color: #f0f0f0;">Technology</div><div class="sector-cell" style="background-color: #f0f0f0;">Financials</div><div class="sector-cell" style="background-color: #f0f0f0;">Communications</div><div class="sector-cell" style="background-color: #f0f0f0;">Discretionary</div><div class="sector-cell" style="background-color: #f0f0f0;">Real Estate</div><div class="sector-cell" style="background-color: #f0f0f0;">Home Builders</div><div class="sector-cell" style="background-color: #f0f0f0;">Biotechnology</div><div class="sector-cell" style="background-color: #f0f0f0;">Regional Banks</div><div class="sector-cell" style="background-color: #f0f0f0;">Healthcare</div><div class="sector-cell" style="background-color: #f0f0f0;">Staples</div><div class="sector-cell" style="background-color: #f0f0f0;">Energy</div><div class="sector-cell" style="background-color: #f0f0f0;">Utilities</div><div class="sector-cell" style="background-color: #f0f0f0;">Materials</div><div class="sector-cell" style="background-color: #f0f0f0;">Industrials</div><div class="sector-cell" style="background-color: #f0f0f0;">Gold</div><div class="sector-cell" style="background-color: #f0f0f0;">Silver</div><div class="sector-cell" style="background-color: #f0f0f0;">Bitcoin</div><div class="sector-cell" style="background-color: #f0f0f0;">Ethereum</div></div>
+    <div class="row">
+        <div class="column">
+            <h2>Daily Bottoms</h2>
+            <table class='sortable'><tr><th>Ticker</th><th>Close Price</th><th>Signal</th><th>Industry</th></tr><tr><td>AEVA</td><td>12.77</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Infrastructure</td></tr><tr><td>AHCO</td><td>10.05</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Medical Devices</td></tr><tr><td>AIP</td><td>15.01</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Semiconductors</td></tr><tr><td>AIRO</td><td>10.29</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Aerospace & Defense</td></tr><tr><td>AVAV</td><td>278.39</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Aerospace & Defense</td></tr><tr><td>AVB</td><td>177.67</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Residential</td></tr><tr><td>AXON</td><td>483.58</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Aerospace & Defense</td></tr><tr><td>BLDP</td><td>2.33</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Specialty Industrial Machinery</td></tr><tr><td>BX</td><td>142.42</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Asset Management</td></tr><tr><td>BXP</td><td>64.67</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Office</td></tr><tr><td>BZAI</td><td>1.36</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Application</td></tr><tr><td>CMPS</td><td>6.69</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Medical Care Facilities</td></tr><tr><td>COLD</td><td>12.41</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Industrial</td></tr><tr><td>CUZ</td><td>25.24</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Office</td></tr><tr><td>DEFT</td><td>0.73</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Capital Markets</td></tr><tr><td>DFDV</td><td>5.17</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Infrastructure</td></tr><tr><td>DLTR</td><td>117.59</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Discount Stores</td></tr><tr><td>ENVX</td><td>6.62</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Electrical Equipment & Parts</td></tr><tr><td>ETHZ</td><td>4.29</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Biotechnology</td></tr><tr><td>EVTL</td><td>4.71</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Aerospace & Defense</td></tr><tr><td>EYE</td><td>26.35</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Specialty Retail</td></tr><tr><td>FA</td><td>13.50</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Specialty Business Services</td></tr><tr><td>FSK</td><td>13.79</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Asset Management</td></tr><tr><td>GEMI</td><td>8.34</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Capital Markets</td></tr><tr><td>GSHD</td><td>61.84</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Insurance Brokers</td></tr><tr><td>HAE</td><td>66.66</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Medical Devices</td></tr><tr><td>HIVE</td><td>2.79</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Capital Markets</td></tr><tr><td>HURN</td><td>169.00</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Consulting Services</td></tr><tr><td>IART</td><td>11.14</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Medical Devices</td></tr><tr><td>IRT</td><td>16.70</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Residential</td></tr><tr><td>JKHY</td><td>179.21</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Information Technology Services</td></tr><tr><td>JOBY</td><td>10.57</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Airports & Air Services</td></tr><tr><td>LWLG</td><td>3.30</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Specialty Chemicals</td></tr><tr><td>MTH</td><td>69.51</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Residential Construction</td></tr><tr><td>PAX</td><td>14.61</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Asset Management</td></tr><tr><td>PAYX</td><td>103.13</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Software - Application</td></tr><tr><td>PSNY</td><td>15.13</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Auto Manufacturers</td></tr><tr><td>QBTS</td><td>21.22</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Computer Hardware</td></tr><tr><td>RKT</td><td>17.93</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Mortgage Finance</td></tr><tr><td>ROIV</td><td>21.62</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Biotechnology</td></tr><tr><td>RVMD</td><td>96.95</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Biotechnology</td></tr><tr><td>RZLV</td><td>2.58</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Infrastructure</td></tr><tr><td>SERV</td><td>10.43</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Specialty Industrial Machinery</td></tr><tr><td>SG</td><td>6.14</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Restaurants</td></tr><tr><td>SHAK</td><td>88.57</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Restaurants</td></tr><tr><td>SHC</td><td>18.12</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Diagnostics & Research</td></tr><tr><td>SKY</td><td>78.38</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Residential Construction</td></tr><tr><td>SLDP</td><td>4.48</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Auto Parts</td></tr><tr><td>TLN</td><td>348.36</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Utilities - Independent Power Producers</td></tr><tr><td>TLRY</td><td>7.46</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Drug Manufacturers - Specialty & Generic</td></tr><tr><td>TPG</td><td>58.91</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Asset Management</td></tr><tr><td>UBER</td><td>80.05</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Application</td></tr><tr><td>UPXI</td><td>1.78</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Internet Content & Information</td></tr><tr><td>VRRM</td><td>19.30</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Information Technology Services</td></tr><tr><td>WH</td><td>72.79</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Lodging</td></tr><tr><td>YETI</td><td>45.71</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Leisure</td></tr></table>
+            <h3>Daily Bottoms by Sector</h3><table><tr><th>Sector</th><th>Count</th></tr><tr><td>Technology</td><td>10</td></tr><tr><td>Industrials</td><td>10</td></tr><tr><td>Financial</td><td>9</td></tr><tr><td>Healthcare</td><td>9</td></tr><tr><td>Consumer Cyclical</td><td>9</td></tr><tr><td>Real Estate</td><td>5</td></tr><tr><td>Consumer Defensive</td><td>1</td></tr><tr><td>Utilities</td><td>1</td></tr><tr><td>Basic Materials</td><td>1</td></tr><tr><td>Communication Services</td><td>1</td></tr></table>
+        </div>
+        <div class="column">
+            <h2>Weekly Bottoms</h2>
+            <table class='sortable'><tr><th>Ticker</th><th>Close Price</th><th>Signal</th><th>Industry</th></tr><tr><td>CPB</td><td>27.98</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Packaged Foods</td></tr><tr><td>DBX</td><td>25.48</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Infrastructure</td></tr><tr><td>DGNX</td><td>1.10</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Consulting Services</td></tr><tr><td>DK</td><td>29.51</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Oil & Gas Refining & Marketing</td></tr><tr><td>DVA</td><td>109.34</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Medical Care Facilities</td></tr><tr><td>ENSG</td><td>171.66</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Medical Care Facilities</td></tr><tr><td>FSLY</td><td>9.25</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Software - Application</td></tr><tr><td>GIS</td><td>46.26</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Packaged Foods</td></tr><tr><td>INN</td><td>4.42</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Hotel & Motel</td></tr><tr><td>KRC</td><td>34.48</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>REIT - Office</td></tr><tr><td>PODD</td><td>255.81</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Medical Devices</td></tr><tr><td>PSKY</td><td>11.21</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Entertainment</td></tr><tr><td>PYPL</td><td>52.69</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Credit Services</td></tr><tr><td>RYAN</td><td>48.28</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Insurance - Specialty</td></tr><tr><td>STAA</td><td>18.95</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Medical Instruments & Supplies</td></tr><tr><td>TRI</td><td>110.63</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Specialty Business Services</td></tr><tr><td>URGN</td><td>19.61</td><td style='background-color: #d4edda;'>DM9 Bot</td><td>Biotechnology</td></tr><tr><td>VTEX</td><td>3.14</td><td style='background-color: #c3e6cb; font-weight: bold;'>DM13 Bot</td><td>Software - Application</td></tr></table>
+            <p><em>Weekly signals last updated on 2026-01-26</em></p>
+            <h3>Weekly Bottoms by Sector</h3><table><tr><th>Sector</th><th>Count</th></tr><tr><td>Healthcare</td><td>5</td></tr><tr><td>Technology</td><td>3</td></tr><tr><td>Consumer Defensive</td><td>2</td></tr><tr><td>Financial</td><td>2</td></tr><tr><td>Industrials</td><td>2</td></tr><tr><td>Real Estate</td><td>2</td></tr><tr><td>Communication Services</td><td>1</td></tr><tr><td>Energy</td><td>1</td></tr></table>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="column">
+            <h2>Daily Tops</h2>
+            <table class='sortable'><tr><th>Ticker</th><th>Close Price</th><th>Signal</th><th>Industry</th></tr><tr><td>ACGL</td><td>96.04</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Insurance - Diversified</td></tr><tr><td>AME</td><td>223.98</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Specialty Industrial Machinery</td></tr><tr><td>AXGN</td><td>34.85</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Medical Devices</td></tr><tr><td>CAG</td><td>18.51</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Packaged Foods</td></tr><tr><td>CME</td><td>289.06</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Financial Data & Stock Exchanges</td></tr><tr><td>CRC</td><td>53.50</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Oil & Gas E&P</td></tr><tr><td>DNOW</td><td>15.19</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Industrial Distribution</td></tr><tr><td>ERIC</td><td>10.80</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Communication Equipment</td></tr><tr><td>HG</td><td>27.75</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Insurance - Reinsurance</td></tr><tr><td>HSBC</td><td>88.01</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Diversified</td></tr><tr><td>ITUB</td><td>8.59</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Banks - Regional</td></tr><tr><td>KO</td><td>74.81</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Beverages - Non-Alcoholic</td></tr><tr><td>LIVN</td><td>65.71</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Medical Devices</td></tr><tr><td>LW</td><td>45.93</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Packaged Foods</td></tr><tr><td>MPWR</td><td>1124.15</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Semiconductors</td></tr><tr><td>NEOG</td><td>10.22</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Diagnostics & Research</td></tr><tr><td>PAYO</td><td>6.39</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Software - Infrastructure</td></tr><tr><td>PWR</td><td>474.63</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Engineering & Construction</td></tr><tr><td>RIG</td><td>4.97</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Oil & Gas Drilling</td></tr><tr><td>SBS</td><td>26.86</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Utilities - Regulated Water</td></tr><tr><td>SM</td><td>19.47</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Oil & Gas E&P</td></tr><tr><td>STX</td><td>407.69</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Computer Hardware</td></tr><tr><td>TKC</td><td>6.66</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Telecom Services</td></tr><tr><td>TRGP</td><td>200.98</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Oil & Gas Midstream</td></tr><tr><td>UGI</td><td>40.11</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Utilities - Regulated Gas</td></tr><tr><td>VIV</td><td>14.18</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Telecom Services</td></tr><tr><td>VOD</td><td>14.65</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Telecom Services</td></tr><tr><td>VRT</td><td>186.18</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Electrical Equipment & Parts</td></tr><tr><td>WDC</td><td>250.23</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Computer Hardware</td></tr><tr><td>WEC</td><td>110.67</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Utilities - Regulated Electric</td></tr><tr><td>WT</td><td>16.20</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Asset Management</td></tr></table>
+            <h3>Daily Tops by Sector</h3><table><tr><th>Sector</th><th>Count</th></tr><tr><td>Financial</td><td>6</td></tr><tr><td>Technology</td><td>5</td></tr><tr><td>Energy</td><td>4</td></tr><tr><td>Industrials</td><td>4</td></tr><tr><td>Consumer Defensive</td><td>3</td></tr><tr><td>Utilities</td><td>3</td></tr><tr><td>Healthcare</td><td>3</td></tr><tr><td>Communication Services</td><td>3</td></tr></table>
+        </div>
+        <div class="column">
+            <h2>Weekly Tops</h2>
+            <table class='sortable'><tr><th>Ticker</th><th>Close Price</th><th>Signal</th><th>Industry</th></tr><tr><td>ACMR</td><td>58.12</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductor Equipment & Materials</td></tr><tr><td>ADTN</td><td>9.22</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Communication Equipment</td></tr><tr><td>AGNC</td><td>11.40</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>REIT - Mortgage</td></tr><tr><td>AIN</td><td>55.49</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Textile Manufacturing</td></tr><tr><td>AIR</td><td>105.91</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Aerospace & Defense</td></tr><tr><td>AME</td><td>223.98</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Specialty Industrial Machinery</td></tr><tr><td>AOS</td><td>73.49</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Specialty Industrial Machinery</td></tr><tr><td>ASTS</td><td>111.21</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Communication Equipment</td></tr><tr><td>AVNT</td><td>36.15</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Specialty Chemicals</td></tr><tr><td>AVY</td><td>185.51</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Packaging & Containers</td></tr><tr><td>AZN</td><td>92.77</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Drug Manufacturers - General</td></tr><tr><td>AZZ</td><td>124.29</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Specialty Business Services</td></tr><tr><td>B</td><td>45.79</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Gold</td></tr><tr><td>BA</td><td>233.72</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Aerospace & Defense</td></tr><tr><td>BANC</td><td>19.98</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Regional</td></tr><tr><td>BEN</td><td>26.62</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Asset Management</td></tr><tr><td>BHP</td><td>68.73</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Other Industrial Metals & Mining</td></tr><tr><td>BKSY</td><td>22.07</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Specialty Business Services</td></tr><tr><td>BOH</td><td>74.78</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Regional</td></tr><tr><td>CAVA</td><td>60.62</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Restaurants</td></tr><tr><td>CBT</td><td>72.19</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Specialty Chemicals</td></tr><tr><td>CCK</td><td>104.68</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Packaging & Containers</td></tr><tr><td>CELH</td><td>52.48</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Beverages - Non-Alcoholic</td></tr><tr><td>CFG</td><td>62.98</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Regional</td></tr><tr><td>CFLT</td><td>30.54</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Software - Infrastructure</td></tr><tr><td>CMPS</td><td>6.69</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Medical Care Facilities</td></tr><tr><td>CNC</td><td>43.32</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Healthcare Plans</td></tr><tr><td>CNI</td><td>96.22</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Railroads</td></tr><tr><td>COMP</td><td>12.52</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Real Estate Services</td></tr><tr><td>COP</td><td>104.23</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Oil & Gas E&P</td></tr><tr><td>CRL</td><td>210.48</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Diagnostics & Research</td></tr><tr><td>DBRG</td><td>15.39</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Asset Management</td></tr><tr><td>DNN</td><td>3.96</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Uranium</td></tr><tr><td>EL</td><td>115.28</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Household & Personal Products</td></tr><tr><td>ENPH</td><td>36.98</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Solar</td></tr><tr><td>ENTG</td><td>118.07</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductor Equipment & Materials</td></tr><tr><td>EXPD</td><td>160.54</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Integrated Freight & Logistics</td></tr><tr><td>FIGR</td><td>56.88</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Capital Markets</td></tr><tr><td>GDS</td><td>44.69</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Information Technology Services</td></tr><tr><td>GEF</td><td>70.62</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Packaging & Containers</td></tr><tr><td>GHC</td><td>1166.63</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Education & Training Services</td></tr><tr><td>GNL</td><td>9.46</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>REIT - Diversified</td></tr><tr><td>GT</td><td>9.41</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Auto Parts</td></tr><tr><td>GTLS</td><td>207.34</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Specialty Industrial Machinery</td></tr><tr><td>GWW</td><td>1079.94</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Industrial Distribution</td></tr><tr><td>GXO</td><td>56.59</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Integrated Freight & Logistics</td></tr><tr><td>HAL</td><td>33.52</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Oil & Gas Equipment & Services</td></tr><tr><td>HLF</td><td>17.24</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Packaged Foods</td></tr><tr><td>IE</td><td>17.09</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Copper</td></tr><tr><td>ING</td><td>29.39</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Diversified</td></tr><tr><td>IRDM</td><td>19.92</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Telecom Services</td></tr><tr><td>IVR</td><td>8.59</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>REIT - Mortgage</td></tr><tr><td>IVZ</td><td>27.29</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Asset Management</td></tr><tr><td>JBL</td><td>237.19</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Electronic Components</td></tr><tr><td>JHG</td><td>48.13</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Asset Management</td></tr><tr><td>JHX</td><td>22.99</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Building Materials</td></tr><tr><td>JXN</td><td>118.92</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Insurance - Life</td></tr><tr><td>KGC</td><td>31.56</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Gold</td></tr><tr><td>KLAC</td><td>1427.94</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductor Equipment & Materials</td></tr><tr><td>KMX</td><td>44.54</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Auto & Truck Dealerships</td></tr><tr><td>KT</td><td>20.92</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Telecom Services</td></tr><tr><td>LAUR</td><td>34.30</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Education & Training Services</td></tr><tr><td>LFST</td><td>7.07</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Medical Care Facilities</td></tr><tr><td>LION</td><td>9.44</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Shell Companies</td></tr><tr><td>LUNR</td><td>18.99</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Aerospace & Defense</td></tr><tr><td>MAR</td><td>315.30</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Lodging</td></tr><tr><td>MBC</td><td>12.12</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Furnishings, Fixtures & Appliances</td></tr><tr><td>MNMD</td><td>17.24</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Biotechnology</td></tr><tr><td>MNST</td><td>80.76</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Beverages - Non-Alcoholic</td></tr><tr><td>MRK</td><td>110.27</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Drug Manufacturers - General</td></tr><tr><td>MRNA</td><td>44.07</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Biotechnology</td></tr><tr><td>MT</td><td>53.97</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Steel</td></tr><tr><td>MTB</td><td>221.57</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Regional</td></tr><tr><td>NGD</td><td>10.03</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Gold</td></tr><tr><td>NRGV</td><td>4.70</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Utilities - Renewable</td></tr><tr><td>NSP</td><td>42.73</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Staffing & Employment Services</td></tr><tr><td>NTRS</td><td>149.43</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Asset Management</td></tr><tr><td>NVO</td><td>59.43</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Drug Manufacturers - General</td></tr><tr><td>NXE</td><td>12.57</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Uranium</td></tr><tr><td>ODFL</td><td>173.20</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Trucking</td></tr><tr><td>OI</td><td>15.28</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Packaging & Containers</td></tr><tr><td>OUT</td><td>24.32</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>REIT - Specialty</td></tr><tr><td>PAA</td><td>19.24</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Oil & Gas Midstream</td></tr><tr><td>PAGP</td><td>20.48</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Oil & Gas Midstream</td></tr><tr><td>PBH</td><td>64.47</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Drug Manufacturers - Specialty & Generic</td></tr><tr><td>PNC</td><td>223.30</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Regional</td></tr><tr><td>POWI</td><td>45.94</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductors</td></tr><tr><td>PRIM</td><td>148.25</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Engineering & Construction</td></tr><tr><td>PRMB</td><td>18.94</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Beverages - Non-Alcoholic</td></tr><tr><td>PTEN</td><td>7.53</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Oil & Gas Drilling</td></tr><tr><td>RAL</td><td>52.97</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Electronic Components</td></tr><tr><td>RCKT</td><td>3.48</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Biotechnology</td></tr><tr><td>RERE</td><td>5.88</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Internet Retail</td></tr><tr><td>RGC</td><td>24.99</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Drug Manufacturers - Specialty & Generic</td></tr><tr><td>RJF</td><td>165.86</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Asset Management</td></tr><tr><td>SAN</td><td>12.75</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Diversified</td></tr><tr><td>SATL</td><td>4.60</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Aerospace & Defense</td></tr><tr><td>SATS</td><td>113.22</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Telecom Services</td></tr><tr><td>SCCO</td><td>190.32</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Copper</td></tr><tr><td>SMFG</td><td>20.99</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Diversified</td></tr><tr><td>SNEX</td><td>112.26</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Capital Markets</td></tr><tr><td>STM</td><td>27.89</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductors</td></tr><tr><td>SUZ</td><td>9.37</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Paper & Paper Products</td></tr><tr><td>SW</td><td>41.63</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Packaging & Containers</td></tr><tr><td>SXC</td><td>7.86</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Coking Coal</td></tr><tr><td>TECK</td><td>53.76</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Other Industrial Metals & Mining</td></tr><tr><td>TGT</td><td>105.47</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Discount Stores</td></tr><tr><td>TNET</td><td>61.24</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Staffing & Employment Services</td></tr><tr><td>TREX</td><td>41.42</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Building Products & Equipment</td></tr><tr><td>TSM</td><td>330.56</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductors</td></tr><tr><td>TWST</td><td>41.07</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Diagnostics & Research</td></tr><tr><td>TXNM</td><td>58.92</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Utilities - Regulated Electric</td></tr><tr><td>UBSI</td><td>42.33</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Banks - Regional</td></tr><tr><td>UMAC</td><td>13.85</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Computer Hardware</td></tr><tr><td>URG</td><td>1.76</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Uranium</td></tr><tr><td>VICR</td><td>157.67</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Electronic Components</td></tr><tr><td>VOYG</td><td>30.53</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Aerospace & Defense</td></tr><tr><td>VSH</td><td>20.15</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Semiconductors</td></tr><tr><td>WHD</td><td>56.23</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Oil & Gas Equipment & Services</td></tr><tr><td>WLK</td><td>79.32</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Specialty Chemicals</td></tr><tr><td>XRAY</td><td>12.47</td><td style='background-color: #ffb3b3;'>DM9 Top</td><td>Medical Instruments & Supplies</td></tr><tr><td>YETI</td><td>45.71</td><td style='background-color: #ff8080; font-weight: bold;'>DM13 Top</td><td>Leisure</td></tr></table>
+            <p><em>Weekly signals last updated on 2026-01-26</em></p>
+            <h3>Weekly Tops by Sector</h3><table><tr><th>Sector</th><th>Count</th></tr><tr><td>Financial</td><td>19</td></tr><tr><td>Industrials</td><td>19</td></tr><tr><td>Technology</td><td>16</td></tr><tr><td>Healthcare</td><td>14</td></tr><tr><td>Basic Materials</td><td>14</td></tr><tr><td>Consumer Cyclical</td><td>13</td></tr><tr><td>Energy</td><td>9</td></tr><tr><td>Consumer Defensive</td><td>8</td></tr><tr><td>Real Estate</td><td>5</td></tr><tr><td>Communication Services</td><td>3</td></tr><tr><td>Utilities</td><td>2</td></tr></table>
+        </div>
+    </div>
+    
+    <script>
+    (function () {
+        document.querySelectorAll("table.sortable").forEach(table => {
+          const headers = table.querySelectorAll("th");
+          headers.forEach((header, i) => {
+            header.addEventListener("click", () => {
+              const tbody = table.tBodies[0] || table;
+              // only grab rows after the header row
+              const rows = Array.from(tbody.querySelectorAll("tr:nth-child(n+2)"));
+
+              const wasAsc = header.classList.contains("asc");
+              const wasDesc = header.classList.contains("desc");
+              const asc = wasDesc || (!wasAsc && !wasDesc);
+
+              headers.forEach(h => h.classList.remove("asc", "desc"));
+              header.classList.add(asc ? "asc" : "desc");
+
+              rows.sort((a, b) => {
+                const aText = a.cells[i]?.innerText.trim() ?? "";
+                const bText = b.cells[i]?.innerText.trim() ?? "";
+                const aNum = parseFloat(aText.replace(/[^0-9.\-]/g, ""));
+                const bNum = parseFloat(bText.replace(/[^0-9.\-]/g, ""));
+                if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+                  return asc ? (aNum - bNum) : (bNum - aNum);
+                }
+                return asc
+                  ? aText.localeCompare(bText, undefined, { numeric: true, sensitivity: "base" })
+                  : bText.localeCompare(aText, undefined, { numeric: true, sensitivity: "base" });
+              });
+
+              rows.forEach(r => tbody.appendChild(r));
+            });
+          });
+        });
+    })();
+    </script>
+    
+    <h2 style="margin-top: 40px;">Sector Signal Trends</h2>
+    <img src="sector_trends.png" alt="Sector Trends" style="max-width: 100%;">
+    </body>
+    </html>
+    
