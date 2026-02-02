@@ -41,16 +41,25 @@ jobs:
       - name: List cache folder contents
         run: ls -la cache/
           
-      - name: ✅ Commit and push changes
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+      - name: Commit and Push Changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}
-    
-          git add docs/index.html docs/sector_trends.png docs/fg_trend.png fear_and_greed_history.csv 
-          git commit -m "🔄 Update report [auto]" || echo "No changes to commit"
-    
-          git pull --rebase origin main || echo "Nothing to pull or rebase"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 1. Stage ALL changes (docs, cache, csvs, etc.)
+          git add .
+          
+          # 2. Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          
+          # 3. Commit
+          git commit -m "🔄 Update report [auto]"
+          
+          # 4. Pull latest changes (Rebase to avoid merge conflicts)
+          git pull --rebase origin main
+          
+          # 5. Push
           git push origin main
