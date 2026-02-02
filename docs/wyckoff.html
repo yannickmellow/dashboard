@@ -2,10 +2,13 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
-        .nav-link { font-size: 1.2em; font-weight: bold; margin-right: 15px; text-decoration: none; color: #007bff; }
-        .nav-link:hover { text-decoration: underline; color: #0056b3; }
-        .active-link { color: #333; text-decoration: none; cursor: default; border-bottom: 2px solid #333; }
         
+        /* Simple Nav Bar to match aesthetics */
+        .nav-bar { margin-bottom: 20px; }
+        .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }
+        .nav-link:hover { text-decoration: underline; color: #0056b3; }
+        .active-link { color: #333; text-decoration: none; cursor: default; }
+
         .date-subtitle { margin-top: 6px; font-size: 0.95em; color: #333; margin-bottom: 12px; }
         .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; color: white; }
         
@@ -15,183 +18,195 @@
         
         .row { display: flex; flex-direction: column; margin-bottom: 30px; }
         .column { flex: 1; margin: 10px 0; width: 100%; }
+        .column table { width: 100% !important; max-width: 100%; box-sizing: border-box; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.1em; display: block; white-space: normal; }
         table tbody { display: table; width: 100%; }
         th, td { border: 1px solid #ccc; padding: 6px 6px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; }
         
+        /* Sortable Headers */
+        .sortable th { color: #007bff; text-decoration: underline; }
+        .sortable th:hover { color: #0056b3; }
+        .sortable th.asc::after { content: " ▲"; font-size: 0.9em; color: #333; }
+        .sortable th.desc::after { content: " ▼"; font-size: 0.9em; color: #333; }
+
+        /* Mobile/Desktop Switch */
         @media (min-width: 64em) {
             .row { flex-direction: row; }
             .column { margin: 0 10px; }
             .summary-table { width: 60%; }
+            table, th, td { font-size: 1.1em; line-height: 1.5; white-space: normal; }
         }
-        
-        th.asc::after { content: " ▲"; font-size: 0.9em; color: #333; }
-        th.desc::after { content: " ▼"; font-size: 0.9em; color: #333; }
     </style>
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        document.querySelectorAll("table").forEach(table => {
-            table.querySelectorAll("th").forEach((header, i) => {
-                header.addEventListener("click", () => {
-                    const tbody = table.querySelector("tbody") || table;
-                    const rows = Array.from(tbody.querySelectorAll("tr")).filter(r => r.parentNode === tbody && !r.querySelector("th"));
-                    const isAsc = header.classList.toggle("asc");
-                    header.classList.remove("desc");
-                    if (!isAsc) header.classList.add("desc");
-                    
-                    rows.sort((a, b) => {
-                        const tA = a.cells[i].innerText;
-                        const tB = b.cells[i].innerText;
-                        const nA = parseFloat(tA.replace(/[^0-9.-]/g, ""));
-                        const nB = parseFloat(tB.replace(/[^0-9.-]/g, ""));
+    (function () {
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll("table.sortable").forEach(table => {
+                const headers = table.querySelectorAll("th");
+                headers.forEach((header, i) => {
+                    header.addEventListener("click", () => {
+                        const tbody = table.tBodies[0] || table;
+                        const rows = Array.from(tbody.querySelectorAll("tr:nth-child(n+2)"));
+                        const wasAsc = header.classList.contains("asc");
+                        const wasDesc = header.classList.contains("desc");
+                        const asc = wasDesc || (!wasAsc && !wasDesc);
                         
-                        if (!isNaN(nA) && !isNaN(nB)) return isAsc ? nA - nB : nB - nA;
-                        return isAsc ? tA.localeCompare(tB) : tB.localeCompare(tA);
+                        headers.forEach(h => h.classList.remove("asc", "desc"));
+                        header.classList.add(asc ? "asc" : "desc");
+                        
+                        rows.sort((a, b) => {
+                            const aText = a.cells[i]?.innerText.trim() ?? "";
+                            const bText = b.cells[i]?.innerText.trim() ?? "";
+                            const aNum = parseFloat(aText.replace(/[^0-9.\-]/g, ""));
+                            const bNum = parseFloat(bText.replace(/[^0-9.\-]/g, ""));
+                            if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) return asc ? (aNum - bNum) : (bNum - aNum);
+                            return asc ? aText.localeCompare(bText, undefined, { numeric: true }) : bText.localeCompare(aText, undefined, { numeric: true });
+                        });
+                        rows.forEach(r => tbody.appendChild(r));
                     });
-                    rows.forEach(r => tbody.appendChild(r));
                 });
             });
         });
-    });
+    })();
     </script>
     </head><body>
-    <div>
+    <div class="nav-bar">
         <a href="index.html" class="nav-link">DeMark Dashboard</a>
         <a href="wyckoff.html" class="nav-link active-link">Wyckoff Scans</a>
     </div>
     <h1>💪 Wyckoff "Sign of Strength"</h1>
-    <div class="date-subtitle">Monday, Feb 02, 2026 - 04:50 UTC</div>
+    <div class="date-subtitle">Monday, Feb 02, 2026 - 05:12 UTC</div>
     
     <div style="background-color:#e2e6ea; padding:15px; border-radius:5px; margin-bottom:20px;">
         <strong>Criteria:</strong> Close > Max(Previous 30 Days) <strong>AND</strong> 5 Consecutive Up-Close Days.
     </div>
     
-    <table>
+    <table class="sortable">
         <thead>
             <tr><th>Ticker</th><th>Price</th><th>Change %</th><th>Sector</th><th>Industry</th><th>Pattern</th></tr>
         </thead>
         <tbody><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=BATRA" target="_blank">BATRA</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=BATRA' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>BATRA</a></td>
                 <td>44.02</td>
                 <td style="color:green">+0.07%</td>
                 <td>Communication Services</td>
                 <td>Entertainment</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=CMBT" target="_blank">CMBT</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=CMBT' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>CMBT</a></td>
                 <td>13.04</td>
                 <td style="color:green">+0.93%</td>
                 <td>Energy</td>
                 <td>Oil & Gas Midstream</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=COP" target="_blank">COP</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=COP' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>COP</a></td>
                 <td>104.23</td>
                 <td style="color:green">+1.39%</td>
                 <td>Energy</td>
                 <td>Oil & Gas E&P</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=CRC" target="_blank">CRC</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=CRC' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>CRC</a></td>
                 <td>53.50</td>
                 <td style="color:green">+2.18%</td>
                 <td>Energy</td>
                 <td>Oil & Gas E&P</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=CRGY" target="_blank">CRGY</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=CRGY' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>CRGY</a></td>
                 <td>9.77</td>
                 <td style="color:green">+1.98%</td>
                 <td>Energy</td>
                 <td>Oil & Gas Integrated</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=CVX" target="_blank">CVX</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=CVX' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>CVX</a></td>
                 <td>176.90</td>
                 <td style="color:green">+3.34%</td>
                 <td>Energy</td>
                 <td>Oil & Gas Integrated</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=FRO" target="_blank">FRO</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=FRO' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>FRO</a></td>
                 <td>28.58</td>
                 <td style="color:green">+0.95%</td>
                 <td>Energy</td>
                 <td>Oil & Gas Midstream</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=YPF" target="_blank">YPF</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=YPF' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>YPF</a></td>
                 <td>39.79</td>
                 <td style="color:green">+0.05%</td>
                 <td>Energy</td>
                 <td>Oil & Gas Integrated</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=GBCI" target="_blank">GBCI</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=GBCI' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>GBCI</a></td>
                 <td>50.68</td>
                 <td style="color:green">+1.50%</td>
                 <td>Financial</td>
                 <td>Banks - Regional</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=JXN" target="_blank">JXN</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=JXN' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>JXN</a></td>
                 <td>118.92</td>
                 <td style="color:green">+0.73%</td>
                 <td>Financial</td>
                 <td>Insurance - Life</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=VCTR" target="_blank">VCTR</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=VCTR' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>VCTR</a></td>
                 <td>70.53</td>
                 <td style="color:green">+1.10%</td>
                 <td>Financial</td>
                 <td>Asset Management</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=WSFS" target="_blank">WSFS</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=WSFS' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>WSFS</a></td>
                 <td>64.73</td>
                 <td style="color:green">+0.02%</td>
                 <td>Financial</td>
                 <td>Banks - Regional</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=MIRM" target="_blank">MIRM</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=MIRM' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>MIRM</a></td>
                 <td>103.22</td>
                 <td style="color:green">+0.29%</td>
                 <td>Healthcare</td>
                 <td>Biotechnology</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=CHRW" target="_blank">CHRW</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=CHRW' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>CHRW</a></td>
                 <td>194.95</td>
                 <td style="color:green">+0.63%</td>
                 <td>Industrials</td>
                 <td>Integrated Freight & Logistics</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=FDX" target="_blank">FDX</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=FDX' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>FDX</a></td>
                 <td>322.25</td>
                 <td style="color:green">+0.73%</td>
                 <td>Industrials</td>
                 <td>Integrated Freight & Logistics</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=GEV" target="_blank">GEV</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=GEV' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>GEV</a></td>
                 <td>726.37</td>
                 <td style="color:green">+1.25%</td>
                 <td>Industrials</td>
                 <td>Specialty Industrial Machinery</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=SBLK" target="_blank">SBLK</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=SBLK' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>SBLK</a></td>
                 <td>22.95</td>
                 <td style="color:green">+0.22%</td>
                 <td>Industrials</td>
                 <td>Marine Shipping</td>
                 <td style="background-color:#d4edda">Breakout + Streak</td>
             </tr><tr>
-                <td><a href="https://www.tradingview.com/chart/?symbol=PEG" target="_blank">PEG</a></td>
+                <td><a href='https://www.tradingview.com/chart/?symbol=PEG' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>PEG</a></td>
                 <td>82.36</td>
                 <td style="color:green">+0.44%</td>
                 <td>Utilities</td>
