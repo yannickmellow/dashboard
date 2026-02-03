@@ -170,8 +170,6 @@ def get_shared_style(fg_color):
         .column { flex: 1; margin: 10px 0; width: 100%; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; table-layout: auto; }
-        
-        /* Default Desktop Padding */
         th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; color: #007bff; text-decoration: underline; }
         
@@ -180,22 +178,15 @@ def get_shared_style(fg_color):
         .nav-link:hover { text-decoration: underline; color: #0056b3; }
         .active-link { color: #333; text-decoration: none; cursor: default; }
 
-        /* CRITICAL MOBILE FIXES */
         @media (max-width: 37.5em) {
             body { margin: 5px; width: 100%; }
             table { width: 100% !important; }
-            
-            /* STOP TEXT INFLATION: This is the magic bullet */
             html { -webkit-text-size-adjust: none; text-size-adjust: none; }
-            
-            /* FORCE Uniform Font Size */
             th, td, a { 
                 font-size: 14px !important; 
                 line-height: 1.4;
-                padding: 6px 2px; /* Tight padding to minimize dead space */
+                padding: 6px 2px;
             }
-            
-            /* Allow Industry column to wrap nicely */
             td:nth-child(4) { 
                 white-space: normal;
                 overflow-wrap: break-word; 
@@ -219,85 +210,4 @@ def get_shared_style(fg_color):
                     const tbody = table.tBodies[0];
                     const rows = Array.from(tbody.querySelectorAll("tr"));
                     const asc = !header.classList.contains("asc");
-                    headers.forEach(h => h.classList.remove("asc", "desc"));
-                    header.classList.add(asc ? "asc" : "desc");
-                    rows.sort((a, b) => {
-                        const aT = a.cells[i].innerText.trim(), bT = b.cells[i].innerText.trim();
-                        const aN = parseFloat(aT.replace(/[^0-9.-]/g, "")), bN = parseFloat(bT.replace(/[^0-9.-]/g, ""));
-                        return !isNaN(aN) && !isNaN(bN) ? (asc ? aN - bN : bN - aN) : (asc ? aT.localeCompare(bT) : bT.localeCompare(aT));
-                    });
-                    rows.forEach(r => tbody.appendChild(r));
-                });
-            });
-        });
-    });
-    </script>
-    """
-    return css
-
-def gen_table(signals):
-    if not signals: return "<p>No signals.</p>"
-    h = "<table class='sortable'><thead><tr><th>Ticker</th><th>Price</th><th>Signal</th><th>Industry</th></tr></thead><tbody>"
-    for t, p, s, ind in signals:
-        bg = "#ffb3b3" if "Top" in s else "#d4edda"
-        link = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
-        h += f"<tr><td>{link}</td><td>{p:.2f}</td><td style='background-color:{bg}; font-weight:{'bold' if '13' in s else 'normal'}'>{s}</td><td>{ind}</td></tr>"
-    return h + "</tbody></table>"
-
-def gen_sec_table(title, counts):
-    if not counts: return ""
-    h = f"<h3>{title}</h3><table><tr><th>Sector</th><th>Count</th></tr>"
-    for s, c in sorted(counts.items(), key=lambda x: x[1], reverse=True): h += f"<tr><td>{s}</td><td>{c}</td></tr>"
-    return h + "</table>"
-
-def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
-    f_val, f_prev, f_date = fg
-    f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
-    style = get_shared_style(f_col)
-    
-    # Index HTML
-    html_i = f"""<html><head><meta charset="UTF-8"><title>Dashboard</title>{style}</head><body>
-    <div class="nav-bar"><a href="index.html" class="nav-link active-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
-    <h1>📈 US DM Dashboard 📉</h1><div class="date-subtitle">{date_str}</div>
-    <div class="fg-box">CNN Fear & Greed: {f_val} (Prev: {f_prev}) on {f_date}</div>
-    <img src="fg_trend.png" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
-    <h2>Signal Summary</h2><table class="summary-table"><tr><th>Totals</th><th>Daily</th><th>Weekly</th></tr>
-    <tr><td><strong>Bottoms</strong></td><td>{len(daily["Bottoms"])}</td><td>{len(weekly["Bottoms"])}</td></tr>
-    <tr><td><strong>Tops</strong></td><td>{len(daily["Tops"])}</td><td>{len(weekly["Tops"])}</td></tr></table>
-    <div class="row">
-        <div class="column"><h3>Daily Bottoms</h3>{gen_table(daily["Bottoms"])}{gen_sec_table("Daily Bottoms by Sector", d_sec["Bottoms"])}</div>
-        <div class="column"><h3>Daily Tops</h3>{gen_table(daily["Tops"])}{gen_sec_table("Daily Tops by Sector", d_sec["Tops"])}</div>
-    </div>
-    <div class="row">
-        <div class="column"><h3>Weekly Bottoms</h3>{gen_table(weekly["Bottoms"])}{gen_sec_table("Weekly Bottoms by Sector", w_sec["Bottoms"])}</div>
-        <div class="column"><h3>Weekly Tops</h3>{gen_table(weekly["Tops"])}{gen_sec_table("Weekly Tops by Sector", w_sec["Tops"])}</div>
-    </div>
-    <h3>Sector Trends</h3><img src="sector_trends.png" style="max-width:100%"></body></html>"""
-    with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_i)
-
-    # Wyckoff HTML (NO SECTOR COLUMN)
-    w_rows = ""
-    for t, p, sec, ind, pct in wyckoff:
-        lk = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
-        w_rows += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td><td>{ind}</td><td style='background-color:#d4edda'>SOS</td></tr>"
-    html_w = f"""<html><head><meta charset="UTF-8"><title>Wyckoff</title>{style}</head><body>
-    <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
-    <h1>💪 Wyckoff SOS</h1><div class="date-subtitle">{date_str}</div>
-    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='5'>None</td></tr>"}</tbody></table></body></html>"""
-    with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
-
-def main():
-    maps, inds = {}, {}
-    for f in ["sp_cache.csv", "russell_cache.csv", "nasdaq_cache.csv", "NDQ_cache.csv", "AMEX_cache.csv", "NYSE_cache.csv"]:
-        m, i = fetch_tickers_and_sectors_from_csv(f); maps.update(m); inds.update(i)
-    daily, d_s, d_date = scan_timeframe(maps, inds, "1D", "1d")
-    weekly, w_s, _ = scan_timeframe(maps, inds, "1W", "1wk")
-    wyckoff = scan_wyckoff(maps, inds)
-    fg = get_fear_and_greed()
-    plot_trends(d_s, w_s)
-    try:
-        ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
-    except: ds = f"Signals triggered on {d_date} (as of NY close)"
-    write_reports(daily, weekly, d_s, w_s, fg, wyckoff, ds)
-
-if __name__ == "__main__": main()
+                    headers.forEach(h => h.classList.remove("
