@@ -19,15 +19,13 @@ os.makedirs("cache", exist_ok=True)
 os.makedirs("docs", exist_ok=True)
 
 def fetch_tickers_and_sectors_from_csv(cache_file):
-    mapping = {}
-    industry_map = {}
+    mapping, industry_map = {}, {}
     if os.path.exists(cache_file):
         with open(cache_file, newline='', encoding='utf-8-sig') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 ticker = row.get('Ticker')
-                sector = row.get('Sector')
-                industry = row.get('Industry')
+                sector, industry = row.get('Sector'), row.get('Industry')
                 if ticker:
                     mapping[ticker.strip()] = sector.strip() if sector else "Unknown"
                     industry_map[ticker.strip()] = industry.strip() if industry else "Unknown"
@@ -61,7 +59,7 @@ def load_or_fetch_price_data(tickers, interval, period, cache_key):
 def compute_dm_signals(df):
     close = df["close"].values
     if len(close) < 20: return False, False, False, False
-    TD = [0] * len(close); TS = [0] * len(close)
+    TD, TS = [0] * len(close), [0] * len(close)
     for i in range(4, len(close)):
         TD[i] = TD[i - 1] + 1 if close[i] > close[i - 4] else 0
         TS[i] = TS[i - 1] + 1 if close[i] < close[i - 4] else 0
@@ -142,16 +140,6 @@ def get_fear_and_greed():
         return score, prev, datetime.utcnow().strftime("%Y-%m-%d")
     except: return "N/A", "N/A", "N/A"
 
-def plot_trends(d_sec, w_sec):
-    secs = sorted(list(set(d_sec["Tops"].keys()) | set(w_sec["Tops"].keys())))
-    if not secs: return
-    d_c = [d_sec["Tops"].get(s,0) + d_sec["Bottoms"].get(s,0) for s in secs]
-    w_c = [w_sec["Tops"].get(s,0) + w_sec["Bottoms"].get(s,0) for s in secs]
-    plt.figure(figsize=(14, 8))
-    plt.barh([i-0.17 for i in range(len(secs))], d_c, 0.35, label="Daily", color="lightcoral")
-    plt.barh([i+0.17 for i in range(len(secs))], w_c, 0.35, label="Weekly", color="skyblue")
-    plt.yticks(range(len(secs)), secs); plt.legend(); plt.tight_layout(); plt.savefig("docs/sector_trends.png"); plt.close()
-
 # ==========================================
 # 5. HTML GENERATION
 # ==========================================
@@ -170,8 +158,6 @@ def get_shared_style(fg_color):
         .column { flex: 1; margin: 10px 0; width: 100%; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; table-layout: auto; }
-        
-        /* Default Desktop Padding */
         th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; color: #007bff; text-decoration: underline; }
         
@@ -179,32 +165,16 @@ def get_shared_style(fg_color):
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }
         .nav-link:hover { text-decoration: underline; color: #0056b3; }
         .active-link { color: #333; text-decoration: none; cursor: default; }
+        
+        .update-footer { margin-top: 50px; font-size: 0.85em; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
 
-        /* CRITICAL MOBILE FIXES */
         @media (max-width: 37.5em) {
-            body { margin: 10px; }
+            body { margin: 5px; width: 100%; }
             table { width: 100% !important; }
-            
-            /* STOP TEXT INFLATION */
             html { -webkit-text-size-adjust: none; text-size-adjust: none; }
-            
-            /* HIDE CHART ON MOBILE */
             .fg-chart { display: none !important; }
-            
-            /* FORCE Uniform Font Size */
-            th, td, a { 
-                font-size: 14px !important; 
-                line-height: 1.4;
-                padding: 8px 8px;
-            }
-            
-            /* Allow Industry column to wrap nicely */
-            td:nth-child(4) { 
-                white-space: normal;
-                overflow-wrap: break-word; 
-                word-wrap: break-word;
-                min-width: 60px;
-            }
+            th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
+            td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
         }
 
         @media (min-width: 64em) {
@@ -243,8 +213,9 @@ def gen_table(signals):
     h = "<table class='sortable'><thead><tr><th>Ticker</th><th>Price</th><th>Signal</th><th>Industry</th></tr></thead><tbody>"
     for t, p, s, ind in signals:
         bg = "#ffb3b3" if "Top" in s else "#d4edda"
-        link = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
-        h += f"<tr><td>{link}</td><td>{p:.2f}</td><td style='background-color:{bg}; font-weight:{'bold' if '13' in s else 'normal'}'>{s}</td><td>{ind}</td></tr>"
+        display_s = s.replace(" Top", "").replace(" Bot", "")
+        lk = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
+        h += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='background-color:{bg}; font-weight:{'bold' if '13' in s else 'normal'}'>{display_s}</td><td>{ind}</td></tr>"
     return h + "</tbody></table>"
 
 def gen_sec_table(title, counts):
@@ -257,10 +228,10 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     f_val, f_prev, f_date = fg
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
-    
     meta = '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+    updated_at = f'<div class="update-footer">Last updated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}</div>'
     
-    # Index HTML (Added class="fg-chart" to image)
+    # Index HTML
     html_i = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link active-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
     <h1>📈 US DM Dashboard 📉</h1><div class="date-subtitle">{date_str}</div>
@@ -277,7 +248,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
         <div class="column"><h3>Weekly Bottoms</h3>{gen_table(weekly["Bottoms"])}{gen_sec_table("Weekly Bottoms by Sector", w_sec["Bottoms"])}</div>
         <div class="column"><h3>Weekly Tops</h3>{gen_table(weekly["Tops"])}{gen_sec_table("Weekly Tops by Sector", w_sec["Tops"])}</div>
     </div>
-    <h3>Sector Trends</h3><img src="sector_trends.png" style="max-width:100%"></body></html>"""
+    {updated_at}</body></html>"""
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_i)
 
     # Wyckoff HTML
@@ -288,7 +259,8 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
     <h1>💪 Wyckoff SOS</h1><div class="date-subtitle">{date_str}</div>
-    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='5'>None</td></tr>"}</tbody></table></body></html>"""
+    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='5'>None</td></tr>"}</tbody></table>
+    {updated_at}</body></html>"""
     with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
 
 def main():
@@ -299,7 +271,6 @@ def main():
     weekly, w_s, _ = scan_timeframe(maps, inds, "1W", "1wk")
     wyckoff = scan_wyckoff(maps, inds)
     fg = get_fear_and_greed()
-    plot_trends(d_s, w_s)
     try:
         ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
     except: ds = f"Signals triggered on {d_date} (as of NY close)"
