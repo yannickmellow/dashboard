@@ -170,7 +170,9 @@ def get_shared_style(fg_color):
         .column { flex: 1; margin: 10px 0; width: 100%; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; table-layout: auto; }
-        th, td { border: 1px solid #ccc; padding: 8px 4px; text-align: left; }
+        
+        /* Default Desktop Padding */
+        th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; color: #007bff; text-decoration: underline; }
         
         .nav-bar { margin-bottom: 20px; }
@@ -178,31 +180,34 @@ def get_shared_style(fg_color):
         .nav-link:hover { text-decoration: underline; color: #0056b3; }
         .active-link { color: #333; text-decoration: none; cursor: default; }
 
-        /* MOBILE STYLING (Max-width 600px) */
+        /* CRITICAL MOBILE FIXES */
         @media (max-width: 37.5em) {
             body { margin: 5px; width: 100%; }
-            table { width: 100% !important; font-size: 14px; } /* Force full width, set uniform size */
+            table { width: 100% !important; }
             
-            /* Uniform font size for ALL cells to fix discrepancy */
-            th, td { 
-                padding: 6px 2px; /* Very tight padding to maximize space */
+            /* STOP TEXT INFLATION: This is the magic bullet */
+            html { -webkit-text-size-adjust: none; text-size-adjust: none; }
+            
+            /* FORCE Uniform Font Size */
+            th, td, a { 
                 font-size: 14px !important; 
+                line-height: 1.4;
+                padding: 6px 2px; /* Tight padding to minimize dead space */
             }
             
-            /* Target Industry Column (4th column in DM and Wyckoff) to prevent dead space */
+            /* Allow Industry column to wrap nicely */
             td:nth-child(4) { 
-                word-break: break-word; 
                 white-space: normal;
-                min-width: 60px; /* Allow it to shrink if needed */
+                overflow-wrap: break-word; 
+                word-wrap: break-word;
+                min-width: 60px;
             }
         }
 
-        /* DESKTOP STYLING */
         @media (min-width: 64em) {
             .row { flex-direction: row; }
             .column { margin: 0 10px; }
             .summary-table { width: 60%; }
-            th, td { padding: 8px 10px; }
         }
     </style>
     <script>
@@ -270,14 +275,11 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     <h3>Sector Trends</h3><img src="sector_trends.png" style="max-width:100%"></body></html>"""
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_i)
 
-    # Wyckoff HTML (REMOVED SECTOR COLUMN)
+    # Wyckoff HTML (NO SECTOR COLUMN)
     w_rows = ""
     for t, p, sec, ind, pct in wyckoff:
         lk = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
-        # Removed {sec} from this row
         w_rows += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td><td>{ind}</td><td style='background-color:#d4edda'>SOS</td></tr>"
-    
-    # Removed Sector header <th>
     html_w = f"""<html><head><meta charset="UTF-8"><title>Wyckoff</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
     <h1>💪 Wyckoff SOS</h1><div class="date-subtitle">{date_str}</div>
