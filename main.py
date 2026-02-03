@@ -125,7 +125,6 @@ def scan_timeframe(ticker_sector_map, ticker_industry_map, interval_label, inter
             if not candle_date:
                 last_date = pd.to_datetime(df['date'].iloc[-1])
                 if getattr(last_date, "tzinfo", None) is not None: last_date = last_date.tz_localize(None)
-                # Store the actual data date for the report header
                 candle_date = last_date.strftime("%Y-%m-%d")
 
             last_close = float(df['close'].iloc[-1])
@@ -146,7 +145,6 @@ def scan_timeframe(ticker_sector_map, ticker_industry_map, interval_label, inter
     results["Tops"].sort(key=lambda x: x[0])
     results["Bottoms"].sort(key=lambda x: x[0])
     
-    # Fallback if no data found
     final_date = candle_date if candle_date else datetime.utcnow().strftime("%Y-%m-%d")
     return results, sector_counts, final_date
 
@@ -185,12 +183,10 @@ def scan_wyckoff_signals(ticker_sector_map, ticker_industry_map):
 def get_fear_and_greed():
     try:
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        # UPDATED HEADERS: Stronger browser mimicry to avoid N/A
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
             "Referer": "https://edition.cnn.com/",
-            "Accept": "application/json",
-            "Accept-Language": "en-US,en;q=0.9"
+            "Accept": "application/json"
         }
         resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
@@ -200,7 +196,6 @@ def get_fear_and_greed():
         score = round(fg.get("score", 0))
         prev = round(fg.get("previous_close", 0))
         
-        # Log History
         date = datetime.utcnow().strftime("%Y-%m-%d")
         with open("fear_and_greed_history.csv", "a", newline="") as f:
             writer = csv.writer(f)
@@ -229,52 +224,151 @@ def plot_trends(daily_sec, weekly_sec):
     plt.close()
 
 # ==========================================
-# 5. HTML GENERATION (STYLES FIXED)
+# 5. HTML GENERATION
 # ==========================================
 
-def get_shared_style():
-    """Restored CSS with table fixes."""
-    return """
+def get_shared_style(fg_color):
+    # This is the EXACT CSS you provided
+    return f"""
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        
-        /* Header & Nav */
-        h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
-        .nav-bar { margin-bottom: 20px; }
-        .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }
-        .nav-link:hover { text-decoration: underline; color: #0056b3; }
-        .active-link { color: #333; text-decoration: none; cursor: default; }
-
-        .date-subtitle { margin-top: 6px; font-size: 0.95em; color: #333; margin-bottom: 12px; }
-        
-        /* Fear & Greed */
-        .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; color: white; font-weight: bold; }
-
-        /* Tables */
-        .summary-table { border-collapse: collapse; margin: 20px 0; width: 100%; }
-        .summary-table th, .summary-table td { border: 1px solid #ccc; padding: 6px 10px; text-align: center; }
-        .summary-table th { background-color: #f0f0f0; }
-        
-        .row { display: flex; flex-direction: column; margin-bottom: 30px; }
-        .column { flex: 1; margin: 10px 0; width: 100%; }
-        
-        /* FIXED: Removed display:block to ensure columns align */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.1em; }
-        th, td { border: 1px solid #ccc; padding: 6px 6px; text-align: left; }
-        th { background-color: #f0f0f0; cursor: pointer; }
-        
-        /* Sortable Headers */
-        .sortable th { color: #007bff; text-decoration: underline; }
-        .sortable th:hover { color: #0056b3; }
-        .sortable th.asc::after { content: " ▲"; font-size: 0.9em; color: #333; }
-        .sortable th.desc::after { content: " ▼"; font-size: 0.9em; color: #333; }
-
-        /* Mobile/Desktop Switch */
-        @media (min-width: 64em) {
-            .row { flex-direction: row; }
-            .column { margin: 0 10px; }
-            .summary-table { width: 60%; }
-        }
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }}
+            h1 {{
+                color: #333;
+                display: flex;
+                align-items: baseline;
+                gap: 12px;
+            }}
+            .date-subtitle {{
+                margin-top: 6px;
+                font-size: 0.95em;
+                color: #333;
+                margin-bottom: 12px;
+            }}
+            .fg-box {{
+                background-color: {fg_color};
+                color: white;
+                padding: 10px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+                display: inline-block;
+            }}
+            .summary-table {{
+                border-collapse: collapse;
+                margin: 20px 0;
+                width: 100%; /* full width on mobile by default */
+            }}
+            .summary-table th,
+            .summary-table td {{
+                border: 1px solid #ccc;
+                padding: 6px 10px;
+                text-align: center;
+            }}
+            .summary-table th {{
+                background-color: #f0f0f0;
+            }}
+            .row {{
+                display: flex;
+                flex-direction: column;  /* default mobile = stacked */
+                margin-bottom: 30px;
+            }}
+            .column {{
+                flex: 1;
+                margin: 10px 0;
+                width: 100%;
+            }}
+            .column table {{
+                width: 100% !important;
+                max-width: 100%;
+                box-sizing: border-box;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 1.1em;
+                display: block;
+                white-space: normal;
+            }}
+            table tbody {{
+                display: table;
+                width: 100%;
+            }}
+            th, td {{
+                border: 1px solid #ccc;
+                padding: 6px 6px;       /* tighter cells for mobile */
+                text-align: left;
+            }}
+            th {{
+                background-color: #f0f0f0;
+            }}
+            table, th, td {{
+                font-size: 1.1em;
+                line-height: 1.5;
+                -webkit-text-size-adjust: 100%;
+            }}
+            .sector-grid {{
+                display: flex;
+                flex-wrap: wrap;
+                margin-bottom: 30px;
+                width: 100%;
+            }}
+            .sector-cell {{
+                border: 1px solid #ccc;
+                padding: 12px 14px;
+                text-align: center;
+                word-wrap: break-word;
+                font-weight: bold;
+                flex: 0 0 33.33%;   /* 3 columns on mobile/tablet */
+                box-sizing: border-box;
+            }}
+            .sortable th {{
+                background-color: #f0f0f0;
+                cursor: pointer;
+                color: #007bff;
+                text-decoration: underline;
+            }}
+            .sortable th:hover {{
+                color: #0056b3;
+            }}
+            .sortable th.asc::after {{
+                content: " ▲";
+                font-size: 0.9em;
+                color: #333;
+            }}
+            .sortable th.desc::after {{
+                content: " ▼";
+                font-size: 0.9em;
+                color: #333;
+            }}
+            /* Desktop overrides for larger screens */
+            @media (min-width: 64em) {{   /* ~1024px if base font size = 16px */
+                .row {{
+                    flex-direction: row;   /* side-by-side columns */
+                }}
+                .column {{
+                    margin: 0 10px;
+                }}
+                table, th, td {{
+                    font-size: 1.1em;        /* normal size */
+                    line-height: 1.5;
+                    white-space: normal;
+                }}
+                .summary-table {{
+                    width: 60%;            /* narrower summary table */
+                }}
+                .sector-cell {{
+                    flex: 0 0 16.66%;      /* 6 columns on wide screens */
+                }}
+            }}
+            
+            /* Add simple nav styling that works with existing CSS */
+            .nav-bar {{ margin-bottom: 20px; }}
+            .nav-link {{ font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }}
+            .nav-link:hover {{ text-decoration: underline; color: #0056b3; }}
+            .active-link {{ color: #333; text-decoration: none; cursor: default; }}
     </style>
     <script>
     (function () {
@@ -314,8 +408,7 @@ def signals_to_html_table(signals):
     html = "<table class='sortable'><thead><tr><th>Ticker</th><th>Price</th><th>Signal</th><th>Industry</th></tr></thead><tbody>"
     for t, price, sig, ind in signals:
         bg = "#ffb3b3" if "Top" in sig else "#d4edda"
-        
-        # BOLD LOGIC: If signal contains "13", make it bold
+        # BOLD DM13 Logic
         weight = "bold" if "13" in str(sig) else "normal"
         
         link = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
@@ -326,19 +419,14 @@ def write_index_html(daily, weekly, fg_data, report_date_str):
     print("✍️ Generating Index HTML...")
     fg_val, fg_prev, fg_date = fg_data
     
-    # Fear & Greed Color Logic
     if isinstance(fg_val, int):
-        if fg_val >= 60: fg_color = "#dc3545" # Red/Greed? (User image shows Yellow/Orange as greed? Adjusted to standard)
-        # Actually standard CNN is: 0-25 Extreme Fear, 25-45 Fear, 45-55 Neutral, 55-75 Greed, 75+ Extreme Greed
-        # User screenshot showed 58 as Yellow. Let's use a dynamic scale or stick to standard:
-        elif fg_val >= 45: fg_color = "#ffc107" # Yellow/Neutral-Greed
-        else: fg_color = "#28a745" # Green/Fear
+        if fg_val >= 60: fg_color = "#dc3545" 
+        elif fg_val >= 45: fg_color = "#ffc107"
+        else: fg_color = "#28a745"
     else:
-        fg_color = "#6c757d" # Gray N/A
+        fg_color = "#6c757d"
 
-    # Use the date string passed from the scanner, not "Now"
-    
-    html = f"""<html><head><meta charset="UTF-8"><title>US DM Dashboard</title>{get_shared_style()}</head><body>
+    html = f"""<html><head><meta charset="UTF-8"><title>US DM Dashboard</title>{get_shared_style(fg_color)}</head><body>
     <div class="nav-bar">
         <a href="index.html" class="nav-link active-link">DeMark Dashboard</a>
         <a href="wyckoff.html" class="nav-link">Wyckoff Scans</a>
@@ -347,7 +435,7 @@ def write_index_html(daily, weekly, fg_data, report_date_str):
     <h1>📈 US DM Dashboard 📉</h1>
     <div class="date-subtitle">{report_date_str}</div>
     
-    <div class="fg-box" style="background-color: {fg_color};">
+    <div class="fg-box">
         CNN Fear & Greed Index: {fg_val} (Prev: {fg_prev}) on {fg_date}
     </div>
     <img src="fg_trend.png" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
@@ -378,6 +466,9 @@ def write_index_html(daily, weekly, fg_data, report_date_str):
 def write_wyckoff_html(wyckoff_res, report_date_str):
     print(f"✍️ Generating Wyckoff HTML with {len(wyckoff_res)} candidates...")
     
+    # Fear & Greed dummy color for shared style
+    fg_color = "#6c757d"
+
     w_rows = ""
     if wyckoff_res:
         for t, price, sec, ind, pct in wyckoff_res:
@@ -394,7 +485,7 @@ def write_wyckoff_html(wyckoff_res, report_date_str):
     else:
         w_rows = "<tr><td colspan='6' style='text-align:center; padding:20px;'>No Wyckoff candidates found matching criteria today.</td></tr>"
 
-    html = f"""<html><head><meta charset="UTF-8"><title>Wyckoff Screener</title>{get_shared_style()}</head><body>
+    html = f"""<html><head><meta charset="UTF-8"><title>Wyckoff Screener</title>{get_shared_style(fg_color)}</head><body>
     <div class="nav-bar">
         <a href="index.html" class="nav-link">DeMark Dashboard</a>
         <a href="wyckoff.html" class="nav-link active-link">Wyckoff Scans</a>
@@ -436,7 +527,6 @@ def main():
     sec_map, sec_ind = fetch_tickers_and_sectors_from_csv("sectors_cache.csv")
 
     # 2. DeMark Scans
-    # Capture the date returned by the daily scan
     daily_res, daily_sec, data_date_str = scan_timeframe(maps, industries, "1D", "1d")
     weekly_res, weekly_sec, _ = scan_timeframe(maps, industries, "1W", "1wk")
     scan_timeframe(sec_map, sec_ind, "Sector", "1d")
@@ -450,7 +540,7 @@ def main():
     plot_trends(daily_sec, weekly_sec)
     
     # 5. Write Reports
-    # Format the subtitle date nicely
+    # Nicely format the date from the data, not today's execution time
     try:
         dt_obj = datetime.strptime(data_date_str, "%Y-%m-%d")
         formatted_date = dt_obj.strftime("%A, %b %d, %Y")
