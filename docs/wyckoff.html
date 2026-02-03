@@ -3,7 +3,7 @@
         body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; }
         h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
         .date-subtitle { margin-top: 6px; font-size: 0.95em; color: #333; margin-bottom: 12px; }
-        .fg-box { color: white; padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 1.1em; background-color: #dc3545; }
+        .fg-box { color: white; padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 1.1em; background-color: #ffc107; }
         .summary-table { border-collapse: collapse; margin: 20px 0; width: 100%; }
         .summary-table th, .summary-table td { border: 1px solid #ccc; padding: 6px 10px; text-align: center; }
         .summary-table th { background-color: #f0f0f0; }
@@ -23,17 +23,20 @@
 
         /* CRITICAL MOBILE FIXES */
         @media (max-width: 37.5em) {
-            body { margin: 5px; width: 100%; }
+            body { margin: 10px; }
             table { width: 100% !important; }
             
             /* STOP TEXT INFLATION */
             html { -webkit-text-size-adjust: none; text-size-adjust: none; }
             
+            /* HIDE CHART ON MOBILE */
+            .fg-chart { display: none !important; }
+            
             /* FORCE Uniform Font Size */
             th, td, a { 
                 font-size: 14px !important; 
                 line-height: 1.4;
-                padding: 6px 2px;
+                padding: 8px 8px;
             }
             
             /* Allow Industry column to wrap nicely */
