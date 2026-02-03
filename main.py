@@ -183,7 +183,7 @@ def get_shared_style(fg_color):
 
         /* CRITICAL MOBILE FIXES */
         @media (max-width: 37.5em) {
-            body { margin: 5px; width: 100%; }
+            body { margin: 10px; }
             table { width: 100% !important; }
             
             /* STOP TEXT INFLATION */
@@ -193,7 +193,7 @@ def get_shared_style(fg_color):
             th, td, a { 
                 font-size: 14px !important; 
                 line-height: 1.4;
-                padding: 6px 2px;
+                padding: 8px 8px;
             }
             
             /* Allow Industry column to wrap nicely */
