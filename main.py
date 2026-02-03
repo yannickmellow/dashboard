@@ -157,7 +157,6 @@ def plot_trends(d_sec, w_sec):
 # ==========================================
 
 def get_shared_style(fg_color):
-    # Standard string (no f-string) to avoid backslash issues
     css = """
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; }
@@ -169,18 +168,36 @@ def get_shared_style(fg_color):
         .summary-table th { background-color: #f0f0f0; }
         .row { display: flex; flex-direction: column; margin-bottom: 30px; }
         .column { flex: 1; margin: 10px 0; width: 100%; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; table-layout: auto; }
         th, td { border: 1px solid #ccc; padding: 8px 4px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; color: #007bff; text-decoration: underline; }
+        
         .nav-bar { margin-bottom: 20px; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }
         .nav-link:hover { text-decoration: underline; color: #0056b3; }
         .active-link { color: #333; text-decoration: none; cursor: default; }
+
+        /* MOBILE STYLING (Max-width 600px) */
         @media (max-width: 37.5em) {
-            body { margin: 10px; }
-            th, td { padding: 8px 2px; font-size: 0.95em; }
-            td:nth-child(4) { word-break: break-word; min-width: 80px; }
+            body { margin: 5px; width: 100%; }
+            table { width: 100% !important; font-size: 14px; } /* Force full width, set uniform size */
+            
+            /* Uniform font size for ALL cells to fix discrepancy */
+            th, td { 
+                padding: 6px 2px; /* Very tight padding to maximize space */
+                font-size: 14px !important; 
+            }
+            
+            /* Target Industry Column (4th column in DM and Wyckoff) to prevent dead space */
+            td:nth-child(4) { 
+                word-break: break-word; 
+                white-space: normal;
+                min-width: 60px; /* Allow it to shrink if needed */
+            }
         }
+
+        /* DESKTOP STYLING */
         @media (min-width: 64em) {
             .row { flex-direction: row; }
             .column { margin: 0 10px; }
@@ -233,7 +250,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
     
-    # Index
+    # Index HTML
     html_i = f"""<html><head><meta charset="UTF-8"><title>Dashboard</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link active-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
     <h1>📈 US DM Dashboard 📉</h1><div class="date-subtitle">{date_str}</div>
@@ -253,15 +270,18 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     <h3>Sector Trends</h3><img src="sector_trends.png" style="max-width:100%"></body></html>"""
     with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_i)
 
-    # Wyckoff
+    # Wyckoff HTML (REMOVED SECTOR COLUMN)
     w_rows = ""
     for t, p, sec, ind, pct in wyckoff:
         lk = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
-        w_rows += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td><td>{sec}</td><td>{ind}</td><td style='background-color:#d4edda'>SOS</td></tr>"
+        # Removed {sec} from this row
+        w_rows += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td><td>{ind}</td><td style='background-color:#d4edda'>SOS</td></tr>"
+    
+    # Removed Sector header <th>
     html_w = f"""<html><head><meta charset="UTF-8"><title>Wyckoff</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
     <h1>💪 Wyckoff SOS</h1><div class="date-subtitle">{date_str}</div>
-    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Sector</th><th>Industry</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='6'>None</td></tr>"}</tbody></table></body></html>"""
+    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='5'>None</td></tr>"}</tbody></table></body></html>"""
     with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
 
 def main():
