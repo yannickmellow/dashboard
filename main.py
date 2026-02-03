@@ -125,6 +125,7 @@ def scan_timeframe(ticker_sector_map, ticker_industry_map, interval_label, inter
             if not candle_date:
                 last_date = pd.to_datetime(df['date'].iloc[-1])
                 if getattr(last_date, "tzinfo", None) is not None: last_date = last_date.tz_localize(None)
+                # Store the actual data date for the report header
                 candle_date = last_date.strftime("%Y-%m-%d")
 
             last_close = float(df['close'].iloc[-1])
@@ -144,7 +145,10 @@ def scan_timeframe(ticker_sector_map, ticker_industry_map, interval_label, inter
 
     results["Tops"].sort(key=lambda x: x[0])
     results["Bottoms"].sort(key=lambda x: x[0])
-    return results, sector_counts, candle_date if candle_date else datetime.utcnow().strftime("%Y-%m-%d")
+    
+    # Fallback if no data found
+    final_date = candle_date if candle_date else datetime.utcnow().strftime("%Y-%m-%d")
+    return results, sector_counts, final_date
 
 def scan_wyckoff_signals(ticker_sector_map, ticker_industry_map):
     cache_file = os.path.join("cache", "price_cache_1D.pkl")
@@ -181,18 +185,31 @@ def scan_wyckoff_signals(ticker_sector_map, ticker_industry_map):
 def get_fear_and_greed():
     try:
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        data = requests.get(url, headers=headers, timeout=5).json()
-        fg = data.get("fear_and_greed", {})
+        # UPDATED HEADERS: Stronger browser mimicry to avoid N/A
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+            "Referer": "https://edition.cnn.com/",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
         
+        fg = data.get("fear_and_greed", {})
+        score = round(fg.get("score", 0))
+        prev = round(fg.get("previous_close", 0))
+        
+        # Log History
         date = datetime.utcnow().strftime("%Y-%m-%d")
         with open("fear_and_greed_history.csv", "a", newline="") as f:
             writer = csv.writer(f)
             if f.tell() == 0: writer.writerow(["Date", "Index", "Previous Close"])
-            writer.writerow([date, round(fg.get("score", 0)), round(fg.get("previous_close", 0))])
+            writer.writerow([date, score, prev])
             
-        return round(fg.get("score", 0)), round(fg.get("previous_close", 0)), date
-    except:
+        return score, prev, date
+    except Exception as e:
+        print(f"⚠️ Fear & Greed Error: {e}")
         return "N/A", "N/A", "N/A"
 
 def plot_trends(daily_sec, weekly_sec):
@@ -212,35 +229,37 @@ def plot_trends(daily_sec, weekly_sec):
     plt.close()
 
 # ==========================================
-# 5. HTML GENERATION (EXACT CSS RESTORED)
+# 5. HTML GENERATION (STYLES FIXED)
 # ==========================================
 
 def get_shared_style():
-    """Returns the EXACT CSS from your original script."""
+    """Restored CSS with table fixes."""
     return """
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
         
-        /* Simple Nav Bar to match aesthetics */
+        /* Header & Nav */
+        h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
         .nav-bar { margin-bottom: 20px; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }
         .nav-link:hover { text-decoration: underline; color: #0056b3; }
         .active-link { color: #333; text-decoration: none; cursor: default; }
 
         .date-subtitle { margin-top: 6px; font-size: 0.95em; color: #333; margin-bottom: 12px; }
-        .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; color: white; }
         
+        /* Fear & Greed */
+        .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; color: white; font-weight: bold; }
+
+        /* Tables */
         .summary-table { border-collapse: collapse; margin: 20px 0; width: 100%; }
         .summary-table th, .summary-table td { border: 1px solid #ccc; padding: 6px 10px; text-align: center; }
         .summary-table th { background-color: #f0f0f0; }
         
         .row { display: flex; flex-direction: column; margin-bottom: 30px; }
         .column { flex: 1; margin: 10px 0; width: 100%; }
-        .column table { width: 100% !important; max-width: 100%; box-sizing: border-box; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.1em; display: block; white-space: normal; }
-        table tbody { display: table; width: 100%; }
+        /* FIXED: Removed display:block to ensure columns align */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.1em; }
         th, td { border: 1px solid #ccc; padding: 6px 6px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; }
         
@@ -255,7 +274,6 @@ def get_shared_style():
             .row { flex-direction: row; }
             .column { margin: 0 10px; }
             .summary-table { width: 60%; }
-            table, th, td { font-size: 1.1em; line-height: 1.5; white-space: normal; }
         }
     </style>
     <script>
@@ -296,24 +314,43 @@ def signals_to_html_table(signals):
     html = "<table class='sortable'><thead><tr><th>Ticker</th><th>Price</th><th>Signal</th><th>Industry</th></tr></thead><tbody>"
     for t, price, sig, ind in signals:
         bg = "#ffb3b3" if "Top" in sig else "#d4edda"
-        # Added TradingView Link to Ticker Column
+        
+        # BOLD LOGIC: If signal contains "13", make it bold
+        weight = "bold" if "13" in str(sig) else "normal"
+        
         link = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
-        html += f"<tr><td>{link}</td><td>{price:.2f}</td><td style='background-color:{bg}'>{sig}</td><td>{ind}</td></tr>"
+        html += f"<tr><td>{link}</td><td>{price:.2f}</td><td style='background-color:{bg}; font-weight:{weight};'>{sig}</td><td>{ind}</td></tr>"
     return html + "</tbody></table>"
 
-def write_index_html(daily, weekly, fg_data, report_date):
+def write_index_html(daily, weekly, fg_data, report_date_str):
     print("✍️ Generating Index HTML...")
     fg_val, fg_prev, fg_date = fg_data
-    fg_color = "#dc3545" if isinstance(fg_val, int) and fg_val >= 60 else "#ffc107" if isinstance(fg_val, int) and fg_val >= 30 else "#28a745"
+    
+    # Fear & Greed Color Logic
+    if isinstance(fg_val, int):
+        if fg_val >= 60: fg_color = "#dc3545" # Red/Greed? (User image shows Yellow/Orange as greed? Adjusted to standard)
+        # Actually standard CNN is: 0-25 Extreme Fear, 25-45 Fear, 45-55 Neutral, 55-75 Greed, 75+ Extreme Greed
+        # User screenshot showed 58 as Yellow. Let's use a dynamic scale or stick to standard:
+        elif fg_val >= 45: fg_color = "#ffc107" # Yellow/Neutral-Greed
+        else: fg_color = "#28a745" # Green/Fear
+    else:
+        fg_color = "#6c757d" # Gray N/A
 
+    # Use the date string passed from the scanner, not "Now"
+    
     html = f"""<html><head><meta charset="UTF-8"><title>US DM Dashboard</title>{get_shared_style()}</head><body>
     <div class="nav-bar">
         <a href="index.html" class="nav-link active-link">DeMark Dashboard</a>
         <a href="wyckoff.html" class="nav-link">Wyckoff Scans</a>
     </div>
-    <h1>📉 US DM Dashboard</h1>
-    <div class="date-subtitle">{report_date}</div>
-    <div class="fg-box" style="background-color: {fg_color};"><strong>CNN Fear & Greed:</strong> {fg_val} (Prev: {fg_prev})</div>
+    
+    <h1>📈 US DM Dashboard 📉</h1>
+    <div class="date-subtitle">{report_date_str}</div>
+    
+    <div class="fg-box" style="background-color: {fg_color};">
+        CNN Fear & Greed Index: {fg_val} (Prev: {fg_prev}) on {fg_date}
+    </div>
+    <img src="fg_trend.png" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
     
     <h2>Signal Summary</h2>
     <table class="summary-table">
@@ -338,7 +375,7 @@ def write_index_html(daily, weekly, fg_data, report_date):
         f.write(html)
     print("✅ Successfully wrote docs/index.html")
 
-def write_wyckoff_html(wyckoff_res, report_date):
+def write_wyckoff_html(wyckoff_res, report_date_str):
     print(f"✍️ Generating Wyckoff HTML with {len(wyckoff_res)} candidates...")
     
     w_rows = ""
@@ -363,7 +400,7 @@ def write_wyckoff_html(wyckoff_res, report_date):
         <a href="wyckoff.html" class="nav-link active-link">Wyckoff Scans</a>
     </div>
     <h1>💪 Wyckoff "Sign of Strength"</h1>
-    <div class="date-subtitle">{report_date}</div>
+    <div class="date-subtitle">{report_date_str}</div>
     
     <div style="background-color:#e2e6ea; padding:15px; border-radius:5px; margin-bottom:20px;">
         <strong>Criteria:</strong> Close > Max(Previous 30 Days) <strong>AND</strong> 5 Consecutive Up-Close Days.
@@ -399,7 +436,8 @@ def main():
     sec_map, sec_ind = fetch_tickers_and_sectors_from_csv("sectors_cache.csv")
 
     # 2. DeMark Scans
-    daily_res, daily_sec, _ = scan_timeframe(maps, industries, "1D", "1d")
+    # Capture the date returned by the daily scan
+    daily_res, daily_sec, data_date_str = scan_timeframe(maps, industries, "1D", "1d")
     weekly_res, weekly_sec, _ = scan_timeframe(maps, industries, "1W", "1wk")
     scan_timeframe(sec_map, sec_ind, "Sector", "1d")
 
@@ -412,9 +450,16 @@ def main():
     plot_trends(daily_sec, weekly_sec)
     
     # 5. Write Reports
-    report_date = datetime.utcnow().strftime("%A, %b %d, %Y - %H:%M UTC")
-    write_index_html(daily_res, weekly_res, fg_data, report_date)
-    write_wyckoff_html(wyckoff_res, report_date)
+    # Format the subtitle date nicely
+    try:
+        dt_obj = datetime.strptime(data_date_str, "%Y-%m-%d")
+        formatted_date = dt_obj.strftime("%A, %b %d, %Y")
+        subtitle = f"Signals triggered on {formatted_date} (as of NY market close)"
+    except:
+        subtitle = f"Signals triggered on {data_date_str} (as of NY market close)"
+
+    write_index_html(daily_res, weekly_res, fg_data, subtitle)
+    write_wyckoff_html(wyckoff_res, subtitle)
     
     print("\n✅ All operations complete.")
 
