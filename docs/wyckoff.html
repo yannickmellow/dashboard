@@ -1,27 +1,29 @@
 <html><head><meta charset="UTF-8"><title>Wyckoff Screener</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
         
-        /* Simple Nav Bar to match aesthetics */
+        /* Header & Nav */
+        h1 { color: #333; display: flex; align-items: baseline; gap: 12px; }
         .nav-bar { margin-bottom: 20px; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: #007bff; }
         .nav-link:hover { text-decoration: underline; color: #0056b3; }
         .active-link { color: #333; text-decoration: none; cursor: default; }
 
         .date-subtitle { margin-top: 6px; font-size: 0.95em; color: #333; margin-bottom: 12px; }
-        .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; color: white; }
         
+        /* Fear & Greed */
+        .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; color: white; font-weight: bold; }
+
+        /* Tables */
         .summary-table { border-collapse: collapse; margin: 20px 0; width: 100%; }
         .summary-table th, .summary-table td { border: 1px solid #ccc; padding: 6px 10px; text-align: center; }
         .summary-table th { background-color: #f0f0f0; }
         
         .row { display: flex; flex-direction: column; margin-bottom: 30px; }
         .column { flex: 1; margin: 10px 0; width: 100%; }
-        .column table { width: 100% !important; max-width: 100%; box-sizing: border-box; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.1em; display: block; white-space: normal; }
-        table tbody { display: table; width: 100%; }
+        /* FIXED: Removed display:block to ensure columns align */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1.1em; }
         th, td { border: 1px solid #ccc; padding: 6px 6px; text-align: left; }
         th { background-color: #f0f0f0; cursor: pointer; }
         
@@ -36,7 +38,6 @@
             .row { flex-direction: row; }
             .column { margin: 0 10px; }
             .summary-table { width: 60%; }
-            table, th, td { font-size: 1.1em; line-height: 1.5; white-space: normal; }
         }
     </style>
     <script>
@@ -76,7 +77,7 @@
         <a href="wyckoff.html" class="nav-link active-link">Wyckoff Scans</a>
     </div>
     <h1>💪 Wyckoff "Sign of Strength"</h1>
-    <div class="date-subtitle">Monday, Feb 02, 2026 - 23:12 UTC</div>
+    <div class="date-subtitle">Signals triggered on Monday, Feb 02, 2026 (as of NY market close)</div>
     
     <div style="background-color:#e2e6ea; padding:15px; border-radius:5px; margin-bottom:20px;">
         <strong>Criteria:</strong> Close > Max(Previous 30 Days) <strong>AND</strong> 5 Consecutive Up-Close Days.
