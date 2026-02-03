@@ -157,7 +157,6 @@ def plot_trends(d_sec, w_sec):
 # ==========================================
 
 def get_shared_style(fg_color):
-    # CSS Template with Placeholder REPLACEMENT_FG_COLOR
     css = """
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; }
@@ -188,6 +187,9 @@ def get_shared_style(fg_color):
             
             /* STOP TEXT INFLATION */
             html { -webkit-text-size-adjust: none; text-size-adjust: none; }
+            
+            /* HIDE CHART ON MOBILE */
+            .fg-chart { display: none !important; }
             
             /* FORCE Uniform Font Size */
             th, td, a { 
@@ -234,7 +236,6 @@ def get_shared_style(fg_color):
     });
     </script>
     """
-    # Safe Replacement
     return css.replace("REPLACEMENT_FG_COLOR", fg_color)
 
 def gen_table(signals):
@@ -257,15 +258,14 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
     
-    # Meta tag for mobile viewport
     meta = '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
     
-    # Index HTML
+    # Index HTML (Added class="fg-chart" to image)
     html_i = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link active-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
     <h1>📈 US DM Dashboard 📉</h1><div class="date-subtitle">{date_str}</div>
     <div class="fg-box">CNN Fear & Greed: {f_val} (Prev: {f_prev}) on {f_date}</div>
-    <img src="fg_trend.png" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
+    <img src="fg_trend.png" class="fg-chart" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
     <h2>Signal Summary</h2><table class="summary-table"><tr><th>Totals</th><th>Daily</th><th>Weekly</th></tr>
     <tr><td><strong>Bottoms</strong></td><td>{len(daily["Bottoms"])}</td><td>{len(weekly["Bottoms"])}</td></tr>
     <tr><td><strong>Tops</strong></td><td>{len(daily["Tops"])}</td><td>{len(weekly["Tops"])}</td></tr></table>
@@ -285,7 +285,6 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
     for t, p, sec, ind, pct in wyckoff:
         lk = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:#007bff; font-weight:bold;'>{t}</a>"
         w_rows += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td><td>{ind}</td><td style='background-color:#d4edda'>SOS</td></tr>"
-    
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
     <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
     <h1>💪 Wyckoff SOS</h1><div class="date-subtitle">{date_str}</div>
