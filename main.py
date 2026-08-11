@@ -18,6 +18,26 @@ import pytz
 os.makedirs("cache", exist_ok=True)
 os.makedirs("docs", exist_ok=True)
 
+def get_market_hours_banner():
+    """Next NYSE regular-session open/close (9:30am-4:00pm ET, weekdays),
+    converted to Adelaide local time. Label auto-switches ACST/ACDT since
+    South Australia observes daylight saving and the US doesn't share the
+    same DST calendar."""
+    ny_tz = pytz.timezone("America/New_York")
+    adl_tz = pytz.timezone("Australia/Adelaide")
+    now_ny = datetime.now(ny_tz)
+    open_ny = now_ny.replace(hour=9, minute=30, second=0, microsecond=0)
+    close_ny = now_ny.replace(hour=16, minute=0, second=0, microsecond=0)
+    if now_ny > close_ny:
+        open_ny += timedelta(days=1)
+        close_ny += timedelta(days=1)
+    while open_ny.weekday() >= 5:  # skip weekends (Sat=5, Sun=6)
+        open_ny += timedelta(days=1)
+        close_ny += timedelta(days=1)
+    open_adl, close_adl = open_ny.astimezone(adl_tz), close_ny.astimezone(adl_tz)
+    fmt = lambda dt: dt.strftime("%I:%M%p").lstrip("0").lower()
+    return f"Market open {fmt(open_adl)}\u2013{fmt(close_adl)} {open_adl.strftime('%Z')}"
+
 def fetch_tickers_and_sectors_from_csv(cache_file):
     mapping, industry_map = {}, {}
     if os.path.exists(cache_file):
@@ -450,8 +470,10 @@ def get_shared_style(fg_color):
         /* Sortable Headers Only */
         table.sortable th { cursor: pointer; color: var(--link-color); text-decoration: underline; background-color: var(--th-bg); }
         
-        /* Dark Mode Toggle */
-        .theme-toggle { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 24px; user-select: none; }
+        /* Top-right bar: market hours banner + dark mode toggle */
+        .topbar { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px; }
+        .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
+        .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
         
         .nav-bar { margin-bottom: 20px; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
@@ -507,6 +529,7 @@ def get_shared_style(fg_color):
             .fg-chart { display: none !important; }
             th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
             td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
+            .market-banner { font-size: 0.68em; padding: 3px 7px; }
         }
 
         @media (min-width: 64em) {
@@ -632,8 +655,13 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
             '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">')
     updated_at = f'<div class="update-footer">Last updated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}</div>'
     
-    # Common Toggle HTML
-    toggle = '<div id="theme-toggle" class="theme-toggle">🌙</div>'
+    # Common top-right bar: market hours banner + dark mode toggle
+    toggle = (
+        f'<div class="topbar">'
+        f'<span class="market-banner">{get_market_hours_banner()}</span>'
+        f'<div id="theme-toggle" class="theme-toggle">🌙</div>'
+        f'</div>'
+    )
     nav = lambda active: (
         '<div class="nav-bar">'
         f'<a href="index.html" class="nav-link{" active-link" if active=="home" else ""}">Home</a>'
@@ -653,7 +681,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
     html_home = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
     {toggle}
     {nav("home")}
-    <h1>📈 US Signals Dashboard</h1><div class="date-subtitle">{date_str}</div>
+    <h1>US Signals Dashboard</h1><div class="date-subtitle">{date_str}</div>
 
     <div class="regime-strip">
         <div class="regime-row">
@@ -687,7 +715,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
     html_dm = f"""<html><head>{meta}<title>DeMark</title>{style}</head><body>
     {toggle}
     {nav("demark")}
-    <h1>📈 DeMark Signals 📉</h1><div class="date-subtitle">{date_str}</div>
+    <h1>DeMark Signals</h1><div class="date-subtitle">{date_str}</div>
     
     <h2>Signal Summary</h2>
     <table class="summary-table">
@@ -723,7 +751,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
     {toggle}
     {nav("wyckoff")}
-    <h1>💪 Wyckoff LPS</h1><div class="date-subtitle">{date_str}</div>
+    <h1>Wyckoff LPS</h1><div class="date-subtitle">{date_str}</div>
     <p style="opacity:0.75; font-size:0.9em; margin-top:-8px;">Last Point of Support: a pullback to a prior volume-confirmed breakout, on light volume, reacting back up.</p>
     <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>SOS Breakout</th><th>Dist. from Support</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='7'>None</td></tr>"}</tbody></table>
     {updated_at}</body></html>"""
