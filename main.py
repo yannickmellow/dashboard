@@ -569,14 +569,22 @@ def get_shared_style(fg_color):
         th, td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; background-color: var(--table-bg); }
         
         /* Sortable Headers Only */
-        table.sortable th { cursor: pointer; color: var(--link-color); text-decoration: underline; background-color: var(--th-bg); }
+        table.sortable th { cursor: pointer; color: var(--text-color); font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; border-bottom: 2px solid var(--link-color); background-color: var(--th-bg); }
+        table.sortable th:hover { color: var(--link-color); }
         
-        /* Top-right bar: market hours banner + dark mode toggle */
-        .topbar { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px; }
+        /* Top-right bar: market hours banner + dark mode toggle.
+           Lives in a flex .page-header alongside .nav-bar (not absolutely
+           positioned) so on narrow screens it wraps to its own line
+           instead of overlapping the nav links. */
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
+        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
+        .section-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+        .section-card table { margin-top: 6px; }
+        .section-card h3 { font-family: var(--font-display); margin-top: 0; }
         
-        .nav-bar { margin-bottom: 20px; }
+        .nav-bar { margin-bottom: 0; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
         .nav-link:hover { text-decoration: underline; opacity: 0.8; }
         .active-link { color: var(--text-color); text-decoration: none; cursor: default; }
@@ -613,6 +621,7 @@ def get_shared_style(fg_color):
         .setup-ticker.bull { color: var(--bull); }
         .setup-ticker.bear { color: var(--bear); }
         .setup-price { font-family: var(--font-mono); color: var(--text-dim); font-size: 0.9em; }
+        .setup-industry { font-family: var(--font-mono); font-size: 0.75em; color: var(--text-dim); margin: 1px 0 8px 0; text-transform: uppercase; letter-spacing: 0.03em; }
         .setup-score { font-family: var(--font-mono); font-weight: 600; font-size: 0.95em; }
         .score-bar-track { height: 5px; border-radius: 3px; background: var(--border-color); margin: 6px 0 8px 0; overflow: hidden; }
         .score-bar-fill { height: 100%; border-radius: 3px; }
@@ -631,6 +640,7 @@ def get_shared_style(fg_color):
             th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
             td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
             .market-banner { font-size: 0.68em; padding: 3px 7px; }
+            .section-card { padding: 12px 14px; }
         }
 
         @media (min-width: 64em) {
@@ -741,6 +751,7 @@ def gen_setup_cards(setups, direction):
                 <span class="setup-price">${r['price']:.2f}</span>
                 <span class="setup-score {cls}" style="color:var(--{'bull' if cls=='bull' else 'bear'});">{r['score']:.2f}</span>
             </div>
+            <div class="setup-industry">{r['industry']}</div>
             <div class="score-bar-track"><div class="score-bar-fill {cls}" style="width:{pct}%;"></div></div>
             <div class="setup-chips">{chips}</div>
         </div>"""
@@ -780,8 +791,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
     bearish_setups = [r for r in top_setups if r["direction"] == "Bearish"]
 
     html_home = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
-    {toggle}
-    {nav("home")}
+    <div class="page-header">{nav("home")}{toggle}</div>
     <h1>US Signals Dashboard</h1><div class="date-subtitle">{date_str}</div>
 
     <div class="regime-strip">
@@ -814,24 +824,25 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
 
     # --- DEMARK HTML (formerly index.html) ---
     html_dm = f"""<html><head>{meta}<title>DeMark</title>{style}</head><body>
-    {toggle}
-    {nav("demark")}
+    <div class="page-header">{nav("demark")}{toggle}</div>
     <h1>DeMark Signals</h1><div class="date-subtitle">{date_str}</div>
     
-    <h2>Signal Summary</h2>
+    <div class="section-card">
+    <h2 style="margin-top:0;">Signal Summary</h2>
     <table class="summary-table">
         <tr><th>Period</th><th>Bottoms</th><th>Tops</th></tr>
         <tr><td><strong>Daily</strong></td><td>{len(daily["Bottoms"])}</td><td>{len(daily["Tops"])}</td></tr>
         <tr><td><strong>Weekly</strong></td><td>{len(weekly["Bottoms"])}</td><td>{len(weekly["Tops"])}</td></tr>
     </table>
+    </div>
     
     <div class="row">
-        <div class="column"><h3>Daily Bottoms</h3>{gen_table(daily["Bottoms"])}{gen_sec_table("Daily Bottoms by Sector", d_sec["Bottoms"])}</div>
-        <div class="column"><h3>Daily Tops</h3>{gen_table(daily["Tops"])}{gen_sec_table("Daily Tops by Sector", d_sec["Tops"])}</div>
+        <div class="column"><div class="section-card"><h3>Daily Bottoms</h3>{gen_table(daily["Bottoms"])}{gen_sec_table("Daily Bottoms by Sector", d_sec["Bottoms"])}</div></div>
+        <div class="column"><div class="section-card"><h3>Daily Tops</h3>{gen_table(daily["Tops"])}{gen_sec_table("Daily Tops by Sector", d_sec["Tops"])}</div></div>
     </div>
     <div class="row">
-        <div class="column"><h3>Weekly Bottoms</h3>{gen_table(weekly["Bottoms"])}{gen_sec_table("Weekly Bottoms by Sector", w_sec["Bottoms"])}</div>
-        <div class="column"><h3>Weekly Tops</h3>{gen_table(weekly["Tops"])}{gen_sec_table("Weekly Tops by Sector", w_sec["Tops"])}</div>
+        <div class="column"><div class="section-card"><h3>Weekly Bottoms</h3>{gen_table(weekly["Bottoms"])}{gen_sec_table("Weekly Bottoms by Sector", w_sec["Bottoms"])}</div></div>
+        <div class="column"><div class="section-card"><h3>Weekly Tops</h3>{gen_table(weekly["Tops"])}{gen_sec_table("Weekly Tops by Sector", w_sec["Tops"])}</div></div>
     </div>
     {updated_at}</body></html>"""
     with open("docs/demark.html", "w", encoding="utf-8") as f: f.write(html_dm)
@@ -850,11 +861,12 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
         )
 
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
-    {toggle}
-    {nav("wyckoff")}
+    <div class="page-header">{nav("wyckoff")}{toggle}</div>
     <h1>Wyckoff LPS</h1><div class="date-subtitle">{date_str}</div>
     <p style="opacity:0.75; font-size:0.9em; margin-top:-8px;">Last Point of Support: a pullback to a prior volume-confirmed breakout, on light volume, reacting back up.</p>
+    <div class="section-card">
     <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>SOS Breakout</th><th>Dist. from Support</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='7'>None</td></tr>"}</tbody></table>
+    </div>
     {updated_at}</body></html>"""
     with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
 
