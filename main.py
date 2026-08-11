@@ -52,6 +52,13 @@ def load_or_fetch_price_data(tickers, interval, period, cache_key):
             time.sleep(0.1)
         except: pass
         
+    if not all_data:
+        # Live fetch returned nothing (network issue, rate limit, etc.) — don't
+        # clobber a good cache with an empty one; fall back to whatever's cached.
+        if os.path.exists(cache_file):
+            with open(cache_file, "rb") as f: return pickle.load(f)
+        return all_data
+
     with open(cache_file, "wb") as f: pickle.dump(all_data, f)
     return all_data
 
@@ -59,9 +66,12 @@ def load_or_fetch_price_data(tickers, interval, period, cache_key):
 # 2. SIGNAL LOGIC
 # ==========================================
 
-def compute_dm_signals(df):
+def _compute_dm_series(df):
+    """Shared TD Sequential computation. Returns (TDUp, TDDn) full arrays so
+    callers can inspect either just the latest bar (compute_dm_signals) or
+    scan back for the most recent occurrence (compute_dm_recency)."""
     close = df["close"].values
-    if len(close) < 20: return False, False, False, False
+    if len(close) < 20: return None, None
     TD, TS = [0] * len(close), [0] * len(close)
     for i in range(4, len(close)):
         TD[i] = TD[i - 1] + 1 if close[i] > close[i - 4] else 0
@@ -72,7 +82,33 @@ def compute_dm_signals(df):
         return 0
     TDUp = [TD[i] - val_reset(TD, i) for i in range(len(close))]
     TDDn = [TS[i] - val_reset(TS, i) for i in range(len(close))]
+    return TDUp, TDDn
+
+def compute_dm_signals(df):
+    TDUp, TDDn = _compute_dm_series(df)
+    if TDUp is None: return False, False, False, False
     return TDUp[-1] == 9, TDUp[-1] == 13, TDDn[-1] == 9, TDDn[-1] == 13
+
+def compute_dm_recency(df, lookback):
+    """
+    Scans back `lookback` bars (not counting today) for the most recent
+    occurrence of each DM signal type. Returns a dict of days_since (0 =
+    today) for each of top9/top13/bot9/bot13, or None if not seen within
+    the lookback window.
+    """
+    TDUp, TDDn = _compute_dm_series(df)
+    result = {"top9": None, "top13": None, "bot9": None, "bot13": None}
+    if TDUp is None: return result
+    n = len(TDUp)
+    today = n - 1
+    earliest = max(0, today - lookback)
+    for i in range(today, earliest - 1, -1):
+        days_since = today - i
+        if result["top9"] is None and TDUp[i] == 9: result["top9"] = days_since
+        if result["top13"] is None and TDUp[i] == 13: result["top13"] = days_since
+        if result["bot9"] is None and TDDn[i] == 9: result["bot9"] = days_since
+        if result["bot13"] is None and TDDn[i] == 13: result["bot13"] = days_since
+    return result
 
 # --- Wyckoff LPS tuning knobs ---
 # Backtested against AMPL + full universe count on 2026-08-11: these settings catch
@@ -211,6 +247,107 @@ def scan_wyckoff(ticker_map, industry_map):
     return sorted(res, key=lambda x: x[0], reverse=True)
 
 # ==========================================
+# 3b. CONFLUENCE SCORING
+# ==========================================
+
+# --- Confluence tuning knobs ---
+CONF_DAILY_LOOKBACK = 10    # trading days a daily DM signal still "counts" for
+CONF_WEEKLY_LOOKBACK = 6    # weekly bars a weekly DM signal still "counts" for
+CONF_PTS = {"weekly13": 3.0, "weekly9": 2.0, "daily13": 2.0, "daily9": 1.0, "wyckoff": 2.0}
+CONF_STACK_BONUS = 1.5      # bonus per additional distinct signal type, same direction
+# Tradeability multiplier: penalize sub-$1 (illiquid/manipulated), boost the
+# $1-$50 range (sizeable for a small account), neutral above that.
+CONF_PRICE_BANDS = [(1.0, 0.5), (20.0, 1.2), (50.0, 1.1), (float("inf"), 1.0)]
+
+def _price_multiplier(price):
+    for ceiling, mult in CONF_PRICE_BANDS:
+        if price < ceiling: return mult
+    return 1.0
+
+def _decay(days_since, lookback):
+    # Linear decay: today (0) = full weight, at the lookback edge = 0.5 weight.
+    if days_since is None: return 0.0
+    return 1.0 - 0.5 * (days_since / max(lookback, 1))
+
+def build_confluence_scores(maps, inds, wyckoff_results, top_n=15):
+    """
+    Combines the daily DM cache, weekly DM cache, and today's Wyckoff LPS
+    results into a single ranked "Top Setups" list. Bullish components
+    (DM bottoms + Wyckoff LPS) and bearish components (DM tops) are scored
+    separately per ticker; the stronger direction wins and is reported.
+    """
+    daily_cache = os.path.join("cache", "price_cache_1D.pkl")
+    weekly_cache = os.path.join("cache", "price_cache_1W.pkl")
+    if not (os.path.exists(daily_cache) and os.path.exists(weekly_cache)):
+        return []
+    with open(daily_cache, "rb") as f: daily_data = pickle.load(f)
+    with open(weekly_cache, "rb") as f: weekly_data = pickle.load(f)
+
+    wyckoff_by_ticker = {row[0]: row for row in wyckoff_results}  # row[5]=days_since (always 0/today)
+
+    results = []
+    tickers = set(daily_data.keys()) & set(weekly_data.keys())
+    for t in tickers:
+        try:
+            ddf = daily_data[t].reset_index(); ddf.columns = [c.lower() for c in ddf.columns]
+            wdf = weekly_data[t].reset_index(); wdf.columns = [c.lower() for c in wdf.columns]
+            if len(ddf) < 20 or len(wdf) < 20: continue
+
+            d_rec = compute_dm_recency(ddf, CONF_DAILY_LOOKBACK)
+            w_rec = compute_dm_recency(wdf, CONF_WEEKLY_LOOKBACK)
+            has_wyckoff = t in wyckoff_by_ticker
+
+            bull_components, bear_components = [], []
+
+            if w_rec["bot13"] is not None:
+                bull_components.append(("Weekly DM13 Bottom", w_rec["bot13"], CONF_PTS["weekly13"] * _decay(w_rec["bot13"], CONF_WEEKLY_LOOKBACK)))
+            elif w_rec["bot9"] is not None:
+                bull_components.append(("Weekly DM9 Bottom", w_rec["bot9"], CONF_PTS["weekly9"] * _decay(w_rec["bot9"], CONF_WEEKLY_LOOKBACK)))
+            if w_rec["top13"] is not None:
+                bear_components.append(("Weekly DM13 Top", w_rec["top13"], CONF_PTS["weekly13"] * _decay(w_rec["top13"], CONF_WEEKLY_LOOKBACK)))
+            elif w_rec["top9"] is not None:
+                bear_components.append(("Weekly DM9 Top", w_rec["top9"], CONF_PTS["weekly9"] * _decay(w_rec["top9"], CONF_WEEKLY_LOOKBACK)))
+
+            if d_rec["bot13"] is not None:
+                bull_components.append(("Daily DM13 Bottom", d_rec["bot13"], CONF_PTS["daily13"] * _decay(d_rec["bot13"], CONF_DAILY_LOOKBACK)))
+            elif d_rec["bot9"] is not None:
+                bull_components.append(("Daily DM9 Bottom", d_rec["bot9"], CONF_PTS["daily9"] * _decay(d_rec["bot9"], CONF_DAILY_LOOKBACK)))
+            if d_rec["top13"] is not None:
+                bear_components.append(("Daily DM13 Top", d_rec["top13"], CONF_PTS["daily13"] * _decay(d_rec["top13"], CONF_DAILY_LOOKBACK)))
+            elif d_rec["top9"] is not None:
+                bear_components.append(("Daily DM9 Top", d_rec["top9"], CONF_PTS["daily9"] * _decay(d_rec["top9"], CONF_DAILY_LOOKBACK)))
+
+            if has_wyckoff:
+                bull_components.append(("Wyckoff LPS", 0, CONF_PTS["wyckoff"]))
+
+            if not bull_components and not bear_components: continue
+
+            bull_raw = sum(c[2] for c in bull_components)
+            bear_raw = sum(c[2] for c in bear_components)
+            bull_score = bull_raw + CONF_STACK_BONUS * max(0, len(bull_components) - 1) if bull_components else 0
+            bear_score = bear_raw + CONF_STACK_BONUS * max(0, len(bear_components) - 1) if bear_components else 0
+
+            direction = "Bullish" if bull_score >= bear_score else "Bearish"
+            components = bull_components if direction == "Bullish" else bear_components
+            raw_score = bull_score if direction == "Bullish" else bear_score
+            if raw_score <= 0: continue
+
+            price = float(ddf["close"].iloc[-1])
+            weighted_score = raw_score * _price_multiplier(price)
+
+            results.append({
+                "ticker": t, "price": price, "direction": direction,
+                "score": round(weighted_score, 2), "raw_score": round(raw_score, 2),
+                "sector": maps.get(t, "Unknown"), "industry": inds.get(t, "Unknown"),
+                "components": components,
+            })
+        except Exception:
+            continue
+
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results[:top_n]
+
+# ==========================================
 # 4. FEAR & GREED / PLOTS
 # ==========================================
 
@@ -259,26 +396,38 @@ def get_shared_style(fg_color):
     css = """
     <style>
         :root {
-            --bg-color: #ffffff;
-            --text-color: #333333;
+            --bg-color: #f6f5f2;
+            --bg-elevated: #ffffff;
+            --text-color: #1b1f24;
+            --text-dim: #6b7280;
             --table-bg: #ffffff;
             --th-bg: #f0f0f0;
-            --border-color: #cccccc;
+            --border-color: #dde1e6;
             --link-color: #007bff;
             --fg-box-text: #ffffff;
+            --bull: #1f9d55;
+            --bear: #c73e3e;
+            --amber: #b5750a;
+            --font-display: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
         }
         
         [data-theme="dark"] {
-            --bg-color: #1a1a1a;
-            --text-color: #e0e0e0;
-            --table-bg: #2d2d2d;
-            --th-bg: #404040;
-            --border-color: #555555;
+            --bg-color: #0b0e11;
+            --bg-elevated: #12161b;
+            --text-color: #e6e9ec;
+            --text-dim: #8b95a1;
+            --table-bg: #12161b;
+            --th-bg: #1a1f26;
+            --border-color: #232830;
             --link-color: #66b3ff;
+            --bull: #3ddc84;
+            --bear: #ff5c5c;
+            --amber: #f5a623;
         }
 
-        body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
-        h1 { display: flex; align-items: baseline; gap: 12px; }
+        body { font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        h1 { display: flex; align-items: baseline; gap: 12px; letter-spacing: -0.01em; }
         
         .date-subtitle { margin-top: 6px; font-size: 0.95em; opacity: 0.8; margin-bottom: 12px; }
         .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 1.1em; background-color: REPLACEMENT_FG_COLOR; color: var(--fg-box-text); }
@@ -316,6 +465,40 @@ def get_shared_style(fg_color):
         .sortable th.asc::after { content: " ▲"; font-size: 0.8em; }
         .sortable th.desc::after { content: " ▼"; font-size: 0.8em; }
 
+        /* --- Front page: regime strip + top setups --- */
+        .ticker-mono { font-family: var(--font-mono); }
+
+        .regime-strip { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; }
+        .regime-row { display: flex; align-items: center; gap: 14px; margin: 10px 0; flex-wrap: wrap; }
+        .regime-label { font-family: var(--font-mono); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); width: 90px; flex-shrink: 0; }
+        .regime-value { font-family: var(--font-mono); font-weight: 600; }
+        .breadth-bar { flex: 1; min-width: 140px; height: 10px; border-radius: 5px; overflow: hidden; display: flex; background: var(--border-color); }
+        .breadth-bull-seg { background-color: var(--bull); height: 100%; }
+        .breadth-bear-seg { background-color: var(--bear); height: 100%; }
+        .breadth-count { font-family: var(--font-mono); font-size: 0.85em; color: var(--text-dim); white-space: nowrap; }
+
+        .setups-heading { font-family: var(--font-display); font-size: 1.3em; font-weight: 700; margin: 6px 0 14px 0; }
+        .setups-columns { display: flex; flex-direction: column; gap: 20px; }
+        .setups-col { flex: 1; }
+        .setups-col-title { font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 2px solid var(--border-color); }
+        .setups-col-title.bull { color: var(--bull); border-bottom-color: var(--bull); }
+        .setups-col-title.bear { color: var(--bear); border-bottom-color: var(--bear); }
+
+        .setup-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
+        .setup-top-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .setup-ticker { font-family: var(--font-mono); font-weight: 700; font-size: 1.05em; text-decoration: none; }
+        .setup-ticker.bull { color: var(--bull); }
+        .setup-ticker.bear { color: var(--bear); }
+        .setup-price { font-family: var(--font-mono); color: var(--text-dim); font-size: 0.9em; }
+        .setup-score { font-family: var(--font-mono); font-weight: 600; font-size: 0.95em; }
+        .score-bar-track { height: 5px; border-radius: 3px; background: var(--border-color); margin: 6px 0 8px 0; overflow: hidden; }
+        .score-bar-fill { height: 100%; border-radius: 3px; }
+        .score-bar-fill.bull { background-color: var(--bull); }
+        .score-bar-fill.bear { background-color: var(--bear); }
+        .setup-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+        .chip { font-family: var(--font-mono); font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: var(--th-bg); color: var(--text-dim); border: 1px solid var(--border-color); white-space: nowrap; }
+        .setups-empty { color: var(--text-dim); font-size: 0.9em; font-style: italic; }
+
         /* Mobile Fixes */
         @media (max-width: 37.5em) {
             body { margin: 10px; }
@@ -330,6 +513,7 @@ def get_shared_style(fg_color):
             .row { flex-direction: row; }
             .column { margin: 0 10px; }
             .summary-table { width: 60%; }
+            .setups-columns { flex-direction: row; }
         }
     </style>
     <script>
@@ -405,25 +589,105 @@ def gen_sec_table(title, counts):
     for s, c in sorted(counts.items(), key=lambda x: x[1], reverse=True): h += f"<tr><td>{s}</td><td>{c}</td></tr>"
     return h + "</table>"
 
-def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
+# Normalization ceiling for the confluence score bar (theoretical rough max:
+# weekly13 + daily13 + wyckoff + 2x stack bonus, times the top price multiplier)
+CONF_SCORE_BAR_MAX = 12.0
+
+def gen_setup_cards(setups, direction):
+    cls = "bull" if direction == "Bullish" else "bear"
+    if not setups:
+        return f'<p class="setups-empty">No {direction.lower()} setups today.</p>'
+    cards = ""
+    for r in setups:
+        pct = min(100, round(r["score"] / CONF_SCORE_BAR_MAX * 100))
+        chips = ""
+        for comp in r["components"]:
+            label = comp[0]
+            if label == "Wyckoff LPS":
+                chips += f'<span class="chip">Wyckoff LPS · today</span>'
+            else:
+                days = comp[1]
+                when = "today" if days == 0 else f"{days}d ago"
+                chips += f'<span class="chip">{label} · {when}</span>'
+        link = f"https://www.tradingview.com/chart/?symbol={r['ticker']}"
+        cards += f"""
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="{link}" target="_blank" class="setup-ticker {cls}">{r['ticker']}</a>
+                <span class="setup-price">${r['price']:.2f}</span>
+                <span class="setup-score {cls}" style="color:var(--{'bull' if cls=='bull' else 'bear'});">{r['score']:.2f}</span>
+            </div>
+            <div class="score-bar-track"><div class="score-bar-fill {cls}" style="width:{pct}%;"></div></div>
+            <div class="setup-chips">{chips}</div>
+        </div>"""
+    return cards
+
+def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str):
     f_val, f_prev, f_date = fg
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
-    meta = '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+    meta = ('<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            '<link rel="preconnect" href="https://fonts.googleapis.com">'
+            '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+            '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">')
     updated_at = f'<div class="update-footer">Last updated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}</div>'
     
     # Common Toggle HTML
     toggle = '<div id="theme-toggle" class="theme-toggle">🌙</div>'
-    
-    # --- INDEX HTML ---
-    # Transposed Summary Table: Rows=Time, Cols=Signal
-    html_i = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
+    nav = lambda active: (
+        '<div class="nav-bar">'
+        f'<a href="index.html" class="nav-link{" active-link" if active=="home" else ""}">Home</a>'
+        f'<a href="demark.html" class="nav-link{" active-link" if active=="demark" else ""}">DeMark</a>'
+        f'<a href="wyckoff.html" class="nav-link{" active-link" if active=="wyckoff" else ""}">Wyckoff</a>'
+        '</div>'
+    )
+
+    # --- HOME (new front page) ---
+    d_bot, d_top = len(daily["Bottoms"]), len(daily["Tops"])
+    total_bt = d_bot + d_top
+    bull_pct = round(d_bot / total_bt * 100) if total_bt else 50
+
+    bullish_setups = [r for r in top_setups if r["direction"] == "Bullish"]
+    bearish_setups = [r for r in top_setups if r["direction"] == "Bearish"]
+
+    html_home = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
     {toggle}
-    <div class="nav-bar"><a href="index.html" class="nav-link active-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
-    <h1>📈 US DM Dashboard 📉</h1><div class="date-subtitle">{date_str}</div>
-    
-    <div class="fg-box">CNN Fear & Greed: {f_val} (Prev: {f_prev}) on {f_date}</div>
-    <img src="fg_trend.png" class="fg-chart" style="max-width: 480px; display:block; margin:6px 0 16px 0;">
+    {nav("home")}
+    <h1>📈 US Signals Dashboard</h1><div class="date-subtitle">{date_str}</div>
+
+    <div class="regime-strip">
+        <div class="regime-row">
+            <span class="regime-label">Sentiment</span>
+            <span class="regime-value" style="color:{f_col};">CNN Fear &amp; Greed: {f_val} (prev {f_prev})</span>
+        </div>
+        <div class="regime-row">
+            <span class="regime-label">Breadth</span>
+            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:{bull_pct}%;"></div><div class="breadth-bear-seg" style="width:{100-bull_pct}%;"></div></div>
+            <span class="breadth-count">{d_bot} bottoms / {d_top} tops (daily)</span>
+        </div>
+        <img src="fg_trend.png" class="fg-chart" style="max-width: 420px; display:block; margin:10px 0 0 0; border-radius:4px;">
+    </div>
+
+    <div class="setups-heading">Top Setups</div>
+    <div class="setups-columns">
+        <div class="setups-col">
+            <div class="setups-col-title bull">Bullish</div>
+            {gen_setup_cards(bullish_setups, "Bullish")}
+        </div>
+        <div class="setups-col">
+            <div class="setups-col-title bear">Bearish</div>
+            {gen_setup_cards(bearish_setups, "Bearish")}
+        </div>
+    </div>
+    <p style="opacity:0.6; font-size:0.85em; margin-top:20px;">Score = weighted sum of confirming signals (weekly/daily DeMark + Wyckoff LPS) across timeframes, with a stacking bonus for multiple distinct signal types and a tradeability multiplier by price. See <a href="demark.html" class="nav-link" style="font-size:1em;">DeMark</a> and <a href="wyckoff.html" class="nav-link" style="font-size:1em;">Wyckoff</a> tabs for the full underlying scans.</p>
+    {updated_at}</body></html>"""
+    with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_home)
+
+    # --- DEMARK HTML (formerly index.html) ---
+    html_dm = f"""<html><head>{meta}<title>DeMark</title>{style}</head><body>
+    {toggle}
+    {nav("demark")}
+    <h1>📈 DeMark Signals 📉</h1><div class="date-subtitle">{date_str}</div>
     
     <h2>Signal Summary</h2>
     <table class="summary-table">
@@ -441,7 +705,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
         <div class="column"><h3>Weekly Tops</h3>{gen_table(weekly["Tops"])}{gen_sec_table("Weekly Tops by Sector", w_sec["Tops"])}</div>
     </div>
     {updated_at}</body></html>"""
-    with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html_i)
+    with open("docs/demark.html", "w", encoding="utf-8") as f: f.write(html_dm)
 
     # --- WYCKOFF HTML ---
     w_rows = ""
@@ -458,7 +722,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
 
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
     {toggle}
-    <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
+    {nav("wyckoff")}
     <h1>💪 Wyckoff LPS</h1><div class="date-subtitle">{date_str}</div>
     <p style="opacity:0.75; font-size:0.9em; margin-top:-8px;">Last Point of Support: a pullback to a prior volume-confirmed breakout, on light volume, reacting back up.</p>
     <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>SOS Breakout</th><th>Dist. from Support</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='7'>None</td></tr>"}</tbody></table>
@@ -474,6 +738,7 @@ def main():
     daily, d_s, d_date = scan_timeframe(maps, inds, "1D", "1d")
     weekly, w_s, _ = scan_timeframe(maps, inds, "1W", "1wk")
     wyckoff = scan_wyckoff(maps, inds)
+    top_setups = build_confluence_scores(maps, inds, wyckoff, top_n=15)
     fg = get_fear_and_greed()
     
     # Generate Graph
@@ -483,6 +748,6 @@ def main():
         ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
     except: ds = f"Signals triggered on {d_date} (as of NY close)"
     
-    write_reports(daily, weekly, d_s, w_s, fg, wyckoff, ds)
+    write_reports(daily, weekly, d_s, w_s, fg, wyckoff, top_setups, ds)
 
 if __name__ == "__main__": main()
