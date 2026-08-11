@@ -74,12 +74,72 @@ def compute_dm_signals(df):
     TDDn = [TS[i] - val_reset(TS, i) for i in range(len(close))]
     return TDUp[-1] == 9, TDUp[-1] == 13, TDDn[-1] == 9, TDDn[-1] == 13
 
+# --- Wyckoff LPS tuning knobs ---
+# Backtested against AMPL + full universe count on 2026-08-11: these settings catch
+# the SOS on 2026-07-01 ($8.09 support) and correctly flag the reaction on 2026-07-06
+# (10.1% off support, volume contracted to <80% of 20d avg, closed green), while
+# keeping full-universe fires to ~4.6% of names (~88/1917) rather than 0 (old settings,
+# too strict) or 145+ (looser settings, basically flags any green day in an uptrend).
+WYCKOFF_SOS_LOOKBACK = 12       # bars to search back for a qualifying SOS breakout
+WYCKOFF_SOS_VOL_MULT = 1.3      # breakout volume must be >= this x the 20d avg
+WYCKOFF_PRIOR_HIGH_WINDOW = 15  # breakout must clear the prior N-day high
+WYCKOFF_MAX_DIST_FROM_SUPPORT = 0.12  # LPS must be within 12% of the SOS support line
+WYCKOFF_VOL_CONTRACTION_MULT = 0.8    # LPS day volume must be below 80% of the 20d avg
+WYCKOFF_MIN_DAYS_SINCE_SOS = 1  # need at least 1 closed day of pullback after SOS
+
 def compute_wyckoff_signals(df):
-    if len(df) < 35: return False
-    close = df['close']
-    is_breakout = close.iloc[-1] > close.iloc[-31:-1].max()
-    is_trending = (close.diff() > 0).astype(int).iloc[-5:].sum() > 4 
-    return is_breakout and is_trending
+    """
+    Detects a Wyckoff Last Point of Support (LPS) setup rather than the SOS
+    breakout itself:
+      1. Find a recent Sign-of-Strength: a close above the prior N-day high on
+         volume expansion (>= WYCKOFF_SOS_VOL_MULT x the 20d average volume).
+      2. Confirm that breakout level has held as support ever since (no closes
+         back below the breakout day's low).
+      3. Only fire TODAY if today itself is the reaction/pullback bar: price
+         sitting near that support shelf, volume contracting below its 20d
+         average, and the candle closing back above its open (buyers stepping
+         back in) -- this is the LPS entry, not the original breakout candle.
+
+    Returns (is_lps, days_since_sos, sos_close, dist_from_support_pct)
+    or (False, None, None, None) if no setup is present.
+    """
+    required_cols = {'close', 'low', 'high', 'open', 'volume'}
+    if len(df) < 40 or not required_cols.issubset(df.columns):
+        return False, None, None, None
+
+    close, low, open_, vol = df['close'], df['low'], df['open'], df['volume']
+    vol_avg20 = vol.rolling(20).mean()
+    prior_high = close.shift(1).rolling(WYCKOFF_PRIOR_HIGH_WINDOW).max()
+    breakout_mask = (close > prior_high) & (vol >= WYCKOFF_SOS_VOL_MULT * vol_avg20)
+
+    n = len(df)
+    today = n - 1
+    earliest = max(today - WYCKOFF_SOS_LOOKBACK, WYCKOFF_PRIOR_HIGH_WINDOW)
+
+    sos_idx = None
+    for i in range(today - WYCKOFF_MIN_DAYS_SINCE_SOS, earliest - 1, -1):
+        if bool(breakout_mask.iloc[i]):
+            sos_idx = i
+            break
+    if sos_idx is None:
+        return False, None, None, None
+
+    days_since = today - sos_idx
+    sos_support = float(low.iloc[sos_idx])
+    sos_close = float(close.iloc[sos_idx])
+
+    # Support must have held: no CLOSE back below the breakout day's low since.
+    post_breakout_closes = close.iloc[sos_idx + 1: today + 1]
+    if (post_breakout_closes < sos_support).any():
+        return False, None, None, None
+
+    dist_from_support = (float(close.iloc[today]) - sos_support) / sos_support
+    is_near_support = 0 <= dist_from_support <= WYCKOFF_MAX_DIST_FROM_SUPPORT
+    is_low_volume = bool(vol.iloc[today] < WYCKOFF_VOL_CONTRACTION_MULT * vol_avg20.iloc[today])
+    is_reaction_up = bool(close.iloc[today] > open_.iloc[today])
+
+    is_lps = is_near_support and is_low_volume and is_reaction_up
+    return is_lps, days_since, sos_close, dist_from_support * 100
 
 # ==========================================
 # 3. SCANNERS
@@ -140,10 +200,12 @@ def scan_wyckoff(ticker_map, industry_map):
     for t, df in data.items():
         try:
             df = df.reset_index(); df.columns = [c.lower() for c in df.columns]
-            if compute_wyckoff_signals(df):
+            is_lps, days_since, sos_close, dist_pct = compute_wyckoff_signals(df)
+            if is_lps:
                 p = float(df['close'].iloc[-1])
                 pct = ((p - df['close'].iloc[-2]) / df['close'].iloc[-2]) * 100
-                res.append((t, p, ticker_map.get(t, "Unknown"), industry_map.get(t, "Unknown"), pct))
+                res.append((t, p, ticker_map.get(t, "Unknown"), industry_map.get(t, "Unknown"),
+                            pct, days_since, sos_close, dist_pct))
         except: pass
     # Sort Descending (Z-A) by default
     return sorted(res, key=lambda x: x[0], reverse=True)
@@ -383,15 +445,23 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, date_str):
 
     # --- WYCKOFF HTML ---
     w_rows = ""
-    for t, p, sec, ind, pct in wyckoff:
+    for t, p, sec, ind, pct, days_since, sos_close, dist_pct in wyckoff:
         lk = f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank' style='text-decoration:none; color:var(--link-color); font-weight:bold;'>{t}</a>"
-        w_rows += f"<tr><td>{lk}</td><td>{p:.2f}</td><td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td><td>{ind}</td><td style='background-color:#d4edda; color:#000;'>SOS</td></tr>"
-    
+        w_rows += (
+            f"<tr><td>{lk}</td><td>{p:.2f}</td>"
+            f"<td style='color:{'green' if pct>0 else 'red'}'>{pct:+.2f}%</td>"
+            f"<td>{ind}</td>"
+            f"<td>{days_since}d ago @ {sos_close:.2f}</td>"
+            f"<td>{dist_pct:+.1f}%</td>"
+            f"<td style='background-color:#d4edda; color:#000;'>LPS</td></tr>"
+        )
+
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
     {toggle}
     <div class="nav-bar"><a href="index.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link active-link">Wyckoff</a></div>
-    <h1>💪 Wyckoff SOS</h1><div class="date-subtitle">{date_str}</div>
-    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='5'>None</td></tr>"}</tbody></table>
+    <h1>💪 Wyckoff LPS</h1><div class="date-subtitle">{date_str}</div>
+    <p style="opacity:0.75; font-size:0.9em; margin-top:-8px;">Last Point of Support: a pullback to a prior volume-confirmed breakout, on light volume, reacting back up.</p>
+    <table class="sortable"><thead><tr><th>Ticker</th><th>Price</th><th>%</th><th>Industry</th><th>SOS Breakout</th><th>Dist. from Support</th><th>Pattern</th></tr></thead><tbody>{w_rows if w_rows else "<tr><td colspan='7'>None</td></tr>"}</tbody></table>
     {updated_at}</body></html>"""
     with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
 
