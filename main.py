@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import pickle
+import json
 from yahooquery import Ticker
 import requests
 import csv
@@ -17,6 +18,7 @@ import pytz
 
 os.makedirs("cache", exist_ok=True)
 os.makedirs("docs", exist_ok=True)
+os.makedirs("data", exist_ok=True)
 
 def get_market_hours_banner():
     """Next NYSE regular-session open/close (9:30am-4:00pm ET, weekdays),
@@ -365,7 +367,106 @@ def build_confluence_scores(maps, inds, wyckoff_results, top_n=15):
             continue
 
     results.sort(key=lambda r: r["score"], reverse=True)
-    return results[:top_n]
+    return results[:top_n] if top_n else results
+
+# ==========================================
+# 3b. SIGNAL LOGGING / BACKTEST TRACK RECORD
+# ==========================================
+
+SIGNAL_LOG_PATH = "data/signal_log.csv"
+RETURN_HORIZONS = [5, 20, 60]  # trading days forward
+SIGNAL_LOG_FIELDS = [
+    "date", "ticker", "direction", "price_at_trigger", "sector", "industry",
+    "raw_score", "price_multiplier", "weighted_score", "components",
+    "return_5d", "return_20d", "return_60d",
+]
+
+def log_signals(all_scores, trigger_date):
+    """
+    Append every scored ticker (not just the Top 15 shown on Home) to the
+    persistent signal log, so enough sample size accumulates over time to
+    backtest each signal type / confluence-score bracket empirically.
+    `components` is logged as JSON (list of [signal_name, days_since, points])
+    so the exact reasoning behind a score is preserved even if the scoring
+    formula (CONF_PTS, decay, stack bonus) changes later.
+    Idempotent: safe to call more than once for the same trading day (e.g. a
+    manual re-run) -- won't duplicate rows already logged for that date.
+    """
+    if not all_scores or not trigger_date or trigger_date == "N/A":
+        return
+    file_exists = os.path.exists(SIGNAL_LOG_PATH)
+    if file_exists:
+        with open(SIGNAL_LOG_PATH, newline="", encoding="utf-8") as f:
+            if any(row["date"] == trigger_date for row in csv.DictReader(f)):
+                return
+    with open(SIGNAL_LOG_PATH, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=SIGNAL_LOG_FIELDS)
+        if not file_exists:
+            writer.writeheader()
+        for r in all_scores:
+            writer.writerow({
+                "date": trigger_date, "ticker": r["ticker"], "direction": r["direction"],
+                "price_at_trigger": r["price"], "sector": r["sector"], "industry": r["industry"],
+                "raw_score": r["raw_score"], "price_multiplier": _price_multiplier(r["price"]),
+                "weighted_score": r["score"], "components": json.dumps(r["components"]),
+                "return_5d": "", "return_20d": "", "return_60d": "",
+            })
+
+def backfill_signal_returns():
+    """
+    Fills in forward returns for older log rows once enough trading days have
+    passed. Looks up each ticker's forward closing price in the *current*
+    daily price cache -- since that cache is a rolling ~6mo window refreshed
+    nightly, any trigger date recent enough for its horizon to have just
+    elapsed (max 60 trading days ~ 3 months) is always still covered.
+    Rewrites the whole file only when at least one cell was actually filled.
+    """
+    if not os.path.exists(SIGNAL_LOG_PATH):
+        return
+    daily_cache_path = os.path.join("cache", "price_cache_1D.pkl")
+    if not os.path.exists(daily_cache_path):
+        return
+    with open(daily_cache_path, "rb") as f:
+        daily_data = pickle.load(f)
+
+    with open(SIGNAL_LOG_PATH, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    changed = False
+    date_index_cache = {}
+    for row in rows:
+        if all(row.get(f"return_{h}d") for h in RETURN_HORIZONS):
+            continue  # fully backfilled already, skip the work
+        t = row["ticker"]
+        if t not in daily_data:
+            continue
+        if t not in date_index_cache:
+            df = daily_data[t].reset_index()
+            df.columns = [c.lower() for c in df.columns]
+            df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.strftime("%Y-%m-%d")
+            date_index_cache[t] = df
+        df = date_index_cache[t]
+        matches = df.index[df["date"] == row["date"]]
+        if len(matches) == 0:
+            continue  # trigger date has rolled out of the cache window
+        trigger_idx = matches[0]
+        base_price = float(row["price_at_trigger"])
+        for h in RETURN_HORIZONS:
+            col = f"return_{h}d"
+            if row.get(col):
+                continue
+            target_idx = trigger_idx + h
+            if target_idx >= len(df):
+                continue  # horizon hasn't elapsed yet
+            fwd_price = float(df["close"].iloc[target_idx])
+            row[col] = round((fwd_price - base_price) / base_price * 100, 2)
+            changed = True
+
+    if changed:
+        with open(SIGNAL_LOG_PATH, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=SIGNAL_LOG_FIELDS)
+            writer.writeheader()
+            writer.writerows(rows)
 
 # ==========================================
 # 4. FEAR & GREED / PLOTS
@@ -766,12 +867,18 @@ def main():
     daily, d_s, d_date = scan_timeframe(maps, inds, "1D", "1d")
     weekly, w_s, _ = scan_timeframe(maps, inds, "1W", "1wk")
     wyckoff = scan_wyckoff(maps, inds)
-    top_setups = build_confluence_scores(maps, inds, wyckoff, top_n=15)
+    all_scores = build_confluence_scores(maps, inds, wyckoff, top_n=None)
+    top_setups = all_scores[:15]
     fg = get_fear_and_greed()
     
     # Generate Graph
     plot_fear_greed_history()
-    
+
+    # Signal log: append today's scored tickers, then backfill forward
+    # returns for any older rows that just reached a 5/20/60-day horizon.
+    log_signals(all_scores, d_date)
+    backfill_signal_returns()
+
     try:
         ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
     except: ds = f"Signals triggered on {d_date} (as of NY close)"
