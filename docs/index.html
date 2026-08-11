@@ -55,8 +55,10 @@
         /* Sortable Headers Only */
         table.sortable th { cursor: pointer; color: var(--link-color); text-decoration: underline; background-color: var(--th-bg); }
         
-        /* Dark Mode Toggle */
-        .theme-toggle { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 24px; user-select: none; }
+        /* Top-right bar: market hours banner + dark mode toggle */
+        .topbar { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px; }
+        .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
+        .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
         
         .nav-bar { margin-bottom: 20px; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
@@ -112,6 +114,7 @@
             .fg-chart { display: none !important; }
             th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
             td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
+            .market-banner { font-size: 0.68em; padding: 3px 7px; }
         }
 
         @media (min-width: 64em) {
@@ -170,9 +173,9 @@
     });
     </script>
     </head><body>
-    <div id="theme-toggle" class="theme-toggle">🌙</div>
+    <div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span><div id="theme-toggle" class="theme-toggle">🌙</div></div>
     <div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
-    <h1>📈 US Signals Dashboard</h1><div class="date-subtitle">Signals triggered on Monday, Aug 10, 2026 (as of NY close)</div>
+    <h1>US Signals Dashboard</h1><div class="date-subtitle">Signals triggered on Monday, Aug 10, 2026 (as of NY close)</div>
 
     <div class="regime-strip">
         <div class="regime-row">
@@ -181,8 +184,8 @@
         </div>
         <div class="regime-row">
             <span class="regime-label">Breadth</span>
-            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:41%;"></div><div class="breadth-bear-seg" style="width:59%;"></div></div>
-            <span class="breadth-count">15 bottoms / 22 tops (daily)</span>
+            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:42%;"></div><div class="breadth-bear-seg" style="width:58%;"></div></div>
+            <span class="breadth-count">16 bottoms / 22 tops (daily)</span>
         </div>
         <img src="fg_trend.png" class="fg-chart" style="max-width: 420px; display:block; margin:10px 0 0 0; border-radius:4px;">
     </div>
@@ -192,24 +195,6 @@
         <div class="setups-col">
             <div class="setups-col-title bull">Bullish</div>
             
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=WLK" target="_blank" class="setup-ticker bull">WLK</a>
-                <span class="setup-price">$79.09</span>
-                <span class="setup-score bull" style="color:var(--bull);">7.65</span>
-            </div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:64%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Bottom · 4d ago</span><span class="chip">Daily DM9 Bottom · 7d ago</span><span class="chip">Wyckoff LPS · today</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=EQX" target="_blank" class="setup-ticker bull">EQX</a>
-                <span class="setup-price">$11.59</span>
-                <span class="setup-score bull" style="color:var(--bull);">6.90</span>
-            </div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:58%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Bottom · 3d ago</span><span class="chip">Wyckoff LPS · today</span></div>
-        </div>
         <div class="setup-card">
             <div class="setup-top-row">
                 <a href="https://www.tradingview.com/chart/?symbol=ARI" target="_blank" class="setup-ticker bull">ARI</a>
@@ -324,6 +309,15 @@
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=HALO" target="_blank" class="setup-ticker bear">HALO</a>
+                <span class="setup-price">$102.62</span>
+                <span class="setup-score bear" style="color:var(--bear);">5.05</span>
+            </div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:42%;"></div></div>
+            <div class="setup-chips"><span class="chip">Weekly DM13 Top · today</span><span class="chip">Daily DM9 Top · 9d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
                 <a href="https://www.tradingview.com/chart/?symbol=NSIT" target="_blank" class="setup-ticker bear">NSIT</a>
                 <span class="setup-price">$154.74</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.05</span>
@@ -331,7 +325,16 @@
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:42%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM13 Top · 5d ago</span><span class="chip">Daily DM13 Top · 2d ago</span></div>
         </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=KLAR" target="_blank" class="setup-ticker bear">KLAR</a>
+                <span class="setup-price">$19.62</span>
+                <span class="setup-score bear" style="color:var(--bear);">5.04</span>
+            </div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:42%;"></div></div>
+            <div class="setup-chips"><span class="chip">Weekly DM13 Top · 5d ago</span><span class="chip">Daily DM9 Top · 1d ago</span></div>
+        </div>
         </div>
     </div>
     <p style="opacity:0.6; font-size:0.85em; margin-top:20px;">Score = weighted sum of confirming signals (weekly/daily DeMark + Wyckoff LPS) across timeframes, with a stacking bonus for multiple distinct signal types and a tradeability multiplier by price. See <a href="demark.html" class="nav-link" style="font-size:1em;">DeMark</a> and <a href="wyckoff.html" class="nav-link" style="font-size:1em;">Wyckoff</a> tabs for the full underlying scans.</p>
-    <div class="update-footer">Last updated: 2026-08-11 04:08 UTC</div></body></html>
+    <div class="update-footer">Last updated: 2026-08-11 05:24 UTC</div></body></html>
