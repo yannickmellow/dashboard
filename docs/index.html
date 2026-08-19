@@ -53,14 +53,22 @@
         th, td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; background-color: var(--table-bg); }
         
         /* Sortable Headers Only */
-        table.sortable th { cursor: pointer; color: var(--link-color); text-decoration: underline; background-color: var(--th-bg); }
+        table.sortable th { cursor: pointer; color: var(--text-color); font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; border-bottom: 2px solid var(--link-color); background-color: var(--th-bg); }
+        table.sortable th:hover { color: var(--link-color); }
         
-        /* Top-right bar: market hours banner + dark mode toggle */
-        .topbar { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px; }
+        /* Top-right bar: market hours banner + dark mode toggle.
+           Lives in a flex .page-header alongside .nav-bar (not absolutely
+           positioned) so on narrow screens it wraps to its own line
+           instead of overlapping the nav links. */
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
+        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
+        .section-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+        .section-card table { margin-top: 6px; }
+        .section-card h3 { font-family: var(--font-display); margin-top: 0; }
         
-        .nav-bar { margin-bottom: 20px; }
+        .nav-bar { margin-bottom: 0; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
         .nav-link:hover { text-decoration: underline; opacity: 0.8; }
         .active-link { color: var(--text-color); text-decoration: none; cursor: default; }
@@ -97,6 +105,7 @@
         .setup-ticker.bull { color: var(--bull); }
         .setup-ticker.bear { color: var(--bear); }
         .setup-price { font-family: var(--font-mono); color: var(--text-dim); font-size: 0.9em; }
+        .setup-industry { font-family: var(--font-mono); font-size: 0.75em; color: var(--text-dim); margin: 1px 0 8px 0; text-transform: uppercase; letter-spacing: 0.03em; }
         .setup-score { font-family: var(--font-mono); font-weight: 600; font-size: 0.95em; }
         .score-bar-track { height: 5px; border-radius: 3px; background: var(--border-color); margin: 6px 0 8px 0; overflow: hidden; }
         .score-bar-fill { height: 100%; border-radius: 3px; }
@@ -115,6 +124,7 @@
             th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
             td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
             .market-banner { font-size: 0.68em; padding: 3px 7px; }
+            .section-card { padding: 12px 14px; }
         }
 
         @media (min-width: 64em) {
@@ -173,8 +183,7 @@
     });
     </script>
     </head><body>
-    <div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span><div id="theme-toggle" class="theme-toggle">🌙</div></div>
-    <div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div>
+    <div class="page-header"><div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div><div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span><div id="theme-toggle" class="theme-toggle">🌙</div></div></div>
     <h1>US Signals Dashboard</h1><div class="date-subtitle">Signals triggered on Tuesday, Aug 18, 2026 (as of NY close)</div>
 
     <div class="regime-strip">
@@ -184,8 +193,8 @@
         </div>
         <div class="regime-row">
             <span class="regime-label">Breadth</span>
-            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:46%;"></div><div class="breadth-bear-seg" style="width:54%;"></div></div>
-            <span class="breadth-count">24 bottoms / 28 tops (daily)</span>
+            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:48%;"></div><div class="breadth-bear-seg" style="width:52%;"></div></div>
+            <span class="breadth-count">23 bottoms / 25 tops (daily)</span>
         </div>
         <img src="fg_trend.png" class="fg-chart" style="max-width: 420px; display:block; margin:10px 0 0 0; border-radius:4px;">
     </div>
@@ -201,6 +210,7 @@
                 <span class="setup-price">$6.32</span>
                 <span class="setup-score bull" style="color:var(--bull);">5.80</span>
             </div>
+            <div class="setup-industry">Aerospace & Defense</div>
             <div class="score-bar-track"><div class="score-bar-fill bull" style="width:48%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · 4d ago</span><span class="chip">Wyckoff LPS · today</span></div>
         </div>
@@ -210,6 +220,7 @@
                 <span class="setup-price">$2.65</span>
                 <span class="setup-score bull" style="color:var(--bull);">5.80</span>
             </div>
+            <div class="setup-industry">Aerospace & Defense</div>
             <div class="score-bar-track"><div class="score-bar-fill bull" style="width:48%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · 4d ago</span><span class="chip">Wyckoff LPS · today</span></div>
         </div>
@@ -219,10 +230,21 @@
             
         <div class="setup-card">
             <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=AMPL" target="_blank" class="setup-ticker bear">AMPL</a>
+                <span class="setup-price">$12.59</span>
+                <span class="setup-score bear" style="color:var(--bear);">6.36</span>
+            </div>
+            <div class="setup-industry">Software - Application</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:53%;"></div></div>
+            <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 2d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
                 <a href="https://www.tradingview.com/chart/?symbol=PATH" target="_blank" class="setup-ticker bear">PATH</a>
                 <span class="setup-price">$15.58</span>
                 <span class="setup-score bear" style="color:var(--bear);">6.24</span>
             </div>
+            <div class="setup-industry">Software - Infrastructure</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:52%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 3d ago</span></div>
         </div>
@@ -232,6 +254,7 @@
                 <span class="setup-price">$15.37</span>
                 <span class="setup-score bear" style="color:var(--bear);">6.24</span>
             </div>
+            <div class="setup-industry">Software - Application</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:52%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 3d ago</span></div>
         </div>
@@ -241,6 +264,7 @@
                 <span class="setup-price">$6.91</span>
                 <span class="setup-score bear" style="color:var(--bear);">6.12</span>
             </div>
+            <div class="setup-industry">Software - Application</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:51%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
         </div>
@@ -250,6 +274,7 @@
                 <span class="setup-price">$106.36</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.95</span>
             </div>
+            <div class="setup-industry">Restaurants</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:50%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM13 Top · 1d ago</span><span class="chip">Daily DM13 Top · 3d ago</span></div>
         </div>
@@ -259,6 +284,7 @@
                 <span class="setup-price">$89.26</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.85</span>
             </div>
+            <div class="setup-industry">Medical Instruments & Supplies</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:49%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM13 Top · 1d ago</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
         </div>
@@ -268,6 +294,7 @@
                 <span class="setup-price">$22.49</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.72</span>
             </div>
+            <div class="setup-industry">Software - Infrastructure</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:48%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 3d ago</span></div>
         </div>
@@ -277,8 +304,19 @@
                 <span class="setup-price">$235.65</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.70</span>
             </div>
+            <div class="setup-industry">Restaurants</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:48%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM13 Top · today</span><span class="chip">Daily DM13 Top · 8d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=U" target="_blank" class="setup-ticker bear">U</a>
+                <span class="setup-price">$46.74</span>
+                <span class="setup-score bear" style="color:var(--bear);">5.61</span>
+            </div>
+            <div class="setup-industry">Software - Application</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:47%;"></div></div>
+            <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
@@ -286,15 +324,7 @@
                 <span class="setup-price">$49.17</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.61</span>
             </div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:47%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=GEN" target="_blank" class="setup-ticker bear">GEN</a>
-                <span class="setup-price">$27.64</span>
-                <span class="setup-score bear" style="color:var(--bear);">5.61</span>
-            </div>
+            <div class="setup-industry">Software - Application</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:47%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
         </div>
@@ -304,15 +334,17 @@
                 <span class="setup-price">$41.50</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.61</span>
             </div>
+            <div class="setup-industry">Software - Infrastructure</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:47%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=U" target="_blank" class="setup-ticker bear">U</a>
-                <span class="setup-price">$46.74</span>
+                <a href="https://www.tradingview.com/chart/?symbol=GEN" target="_blank" class="setup-ticker bear">GEN</a>
+                <span class="setup-price">$27.64</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.61</span>
             </div>
+            <div class="setup-industry">Software - Infrastructure</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:47%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
         </div>
@@ -322,19 +354,11 @@
                 <span class="setup-price">$31.91</span>
                 <span class="setup-score bear" style="color:var(--bear);">5.54</span>
             </div>
+            <div class="setup-industry">Software - Application</div>
             <div class="score-bar-track"><div class="score-bar-fill bear" style="width:46%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM9 Top · 1d ago</span><span class="chip">Daily DM13 Top · 3d ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=IMVT" target="_blank" class="setup-ticker bear">IMVT</a>
-                <span class="setup-price">$44.30</span>
-                <span class="setup-score bear" style="color:var(--bear);">5.50</span>
-            </div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:46%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Top · 2d ago</span><span class="chip">Daily DM9 Top · today</span></div>
         </div>
         </div>
     </div>
     <p style="opacity:0.6; font-size:0.85em; margin-top:20px;">Score = weighted sum of confirming signals (weekly/daily DeMark + Wyckoff LPS) across timeframes, with a stacking bonus for multiple distinct signal types and a tradeability multiplier by price. See <a href="demark.html" class="nav-link" style="font-size:1em;">DeMark</a> and <a href="wyckoff.html" class="nav-link" style="font-size:1em;">Wyckoff</a> tabs for the full underlying scans.</p>
-    <div class="update-footer">Last updated: 2026-08-18 21:21 UTC</div></body></html>
+    <div class="update-footer">Last updated: 2026-08-19 03:17 UTC</div></body></html>
