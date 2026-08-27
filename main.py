@@ -443,7 +443,17 @@ def backfill_signal_returns():
         if t not in date_index_cache:
             df = daily_data[t].reset_index()
             df.columns = [c.lower() for c in df.columns]
-            df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.strftime("%Y-%m-%d")
+            # The cache window spans several months, which can cross a US
+            # DST change -- yahooquery then attaches different UTC offsets
+            # (EST vs EDT) to different rows, which pd.to_datetime can't
+            # unify without utc=True. errors="coerce" additionally makes a
+            # single unparseable row a NaT (skipped later) rather than a
+            # crash that would block write_reports() from ever running.
+            df["date"] = (
+                pd.to_datetime(df["date"], utc=True, errors="coerce")
+                .dt.tz_convert(None)
+                .dt.strftime("%Y-%m-%d")
+            )
             date_index_cache[t] = df
         df = date_index_cache[t]
         matches = df.index[df["date"] == row["date"]]
@@ -888,8 +898,14 @@ def main():
 
     # Signal log: append today's scored tickers, then backfill forward
     # returns for any older rows that just reached a 5/20/60-day horizon.
-    log_signals(all_scores, d_date)
-    backfill_signal_returns()
+    # Wrapped defensively: this is a nice-to-have for future backtesting,
+    # and must never be able to stop write_reports() from running and
+    # updating the live site, no matter what goes wrong inside it.
+    try:
+        log_signals(all_scores, d_date)
+        backfill_signal_returns()
+    except Exception as e:
+        print(f"WARNING: signal logging/backfill failed, continuing without it: {e}")
 
     try:
         ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
