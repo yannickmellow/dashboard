@@ -557,6 +557,27 @@ def get_shared_style(fg_color):
             --amber: #f5a623;
         }
 
+        /* Default to the OS/browser's color-scheme preference when the person
+           hasn't made an explicit choice via the toggle. :root:not([data-theme="light"])
+           means an explicit manual "light" choice still wins over a dark system
+           preference; the [data-theme="dark"] rule above separately covers an
+           explicit manual "dark" choice overriding a light system preference. */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg-color: #0b0e11;
+                --bg-elevated: #12161b;
+                --text-color: #e6e9ec;
+                --text-dim: #8b95a1;
+                --table-bg: #12161b;
+                --th-bg: #1a1f26;
+                --border-color: #232830;
+                --link-color: #66b3ff;
+                --bull: #3ddc84;
+                --bear: #ff5c5c;
+                --amber: #f5a623;
+            }
+        }
+
         body { font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
         h1 { display: flex; align-items: baseline; gap: 12px; letter-spacing: -0.01em; }
         
@@ -576,7 +597,7 @@ def get_shared_style(fg_color):
         .column { flex: 1; margin: 10px 0; width: 100%; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; table-layout: auto; }
-        th, td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; background-color: var(--table-bg); }
+        th, td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; background-color: var(--table-bg); color: var(--text-color); }
         
         /* Sortable Headers Only */
         table.sortable th { cursor: pointer; color: var(--text-color); font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; border-bottom: 2px solid var(--link-color); background-color: var(--th-bg); }
@@ -662,19 +683,36 @@ def get_shared_style(fg_color):
     </style>
     <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Dark Mode Logic
+        // Dark Mode Logic: defaults to the OS/browser color-scheme preference
+        // (handled by CSS media query) until the person clicks the toggle,
+        // at which point that explicit choice is saved and takes over.
         const toggle = document.getElementById('theme-toggle');
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme) {
-            document.documentElement.setAttribute('data-theme', currentTheme);
-            toggle.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+        const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        let savedTheme = localStorage.getItem('theme'); // 'dark' | 'light' | null (= follow system)
+
+        function effectiveTheme() {
+            return savedTheme || (systemDarkQuery.matches ? 'dark' : 'light');
         }
+        function syncIcon() {
+            toggle.textContent = effectiveTheme() === 'dark' ? '☀️' : '🌙';
+        }
+
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+        syncIcon();
+
         toggle.addEventListener('click', () => {
-            let theme = document.documentElement.getAttribute('data-theme');
-            let newTheme = theme === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            toggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            savedTheme = effectiveTheme() === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            localStorage.setItem('theme', savedTheme);
+            syncIcon();
+        });
+
+        // If the person hasn't made a manual choice, keep following the OS
+        // setting live (e.g. it flips at sunset) without needing a reload.
+        systemDarkQuery.addEventListener('change', () => {
+            if (!savedTheme) syncIcon();
         });
 
         // Sorting Logic
