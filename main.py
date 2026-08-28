@@ -214,11 +214,20 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
     # consecutive bars in a row satisfy the 4-bars-back comparison." The code
     # does have a hard floor of 20 bars (_compute_dm_series returns nothing
     # below that) -- at exactly 20 bars the max achievable streak is 16,
-    # comfortably covering DM13 (needs >=17 bars to ever be reachable). 2y of
-    # monthly bars (~24) matches weekly's already-proven period, clearing that
-    # floor with a few bars of margin for API quirks or an unusually long
-    # real streak -- no need for years of extra history beyond that.
-    PERIOD_BY_INTERVAL = {'1mo': '2y', '1wk': '2y'}
+    # comfortably covering DM13 (needs >=17 bars to ever be reachable).
+    #   - monthly: 2y (~24 bars) -- deliberately tight-ish margin since real
+    #     16+ month uninterrupted streaks are essentially unheard of.
+    #   - weekly: 1y (~52 bars) -- more margin than monthly since a 16+ week
+    #     uninterrupted streak (quarterly momentum) is meaningfully more
+    #     plausible in real data; verified DM13 still detects correctly at
+    #     even 24 bars, so 52 has a comfortable safety buffer.
+    #   - daily (below, via load_or_fetch_price_data fallback '6mo'): NOT
+    #     reduced to the DM-only minimum -- price_cache_1D.pkl is also the
+    #     sole price source for the Wyckoff LPS scanner, which needs a
+    #     40+ bar floor plus rolling(20)/rolling(15) lead-in across its own
+    #     12-day SOS search window. Left as-is pending a separate, more
+    #     careful pass specific to Wyckoff's requirements.
+    PERIOD_BY_INTERVAL = {'1mo': '2y', '1wk': '1y'}
     period = PERIOD_BY_INTERVAL.get(interval, '6mo')
     data = load_or_fetch_price_data(tickers, interval, period, label)
     candle_date = None
