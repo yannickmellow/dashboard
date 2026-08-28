@@ -84,6 +84,20 @@ def load_or_fetch_price_data(tickers, interval, period, cache_key):
     with open(cache_file, "wb") as f: pickle.dump(all_data, f)
     return all_data
 
+def _drop_incomplete_bar(df):
+    """Drop the most recent bar if it's still in-progress. Yahoo returns a
+    live-updating snapshot for the current week/month before it actually
+    closes (identifiable by an intraday timestamp, e.g. '2026-08-27
+    16:00:03-04:00', vs the clean calendar dates on real closed bars) --
+    reading it as-is means today's still-forming candle can spuriously
+    register as a confirmed DM9/13 signal that might not survive to the
+    real close. Assumes the script runs daily. Every reader of weekly/
+    monthly price data must apply this -- previously only scan_timeframe()
+    did, while build_confluence_scores() (which powers the Home page's Top
+    Setups) read the raw cache directly and could report a signal as
+    'today' that hadn't actually confirmed yet."""
+    return df.iloc[:-1] if len(df) > 1 else df
+
 # ==========================================
 # 2. SIGNAL LOGIC
 # ==========================================
@@ -245,13 +259,8 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
             df.columns = [c.lower() for c in df.columns]
             
             # --- FIX FOR FALSE WEEKLY/MONTHLY SIGNALS ---
-            # For weekly or monthly bars, the most recent bar is still
-            # in-progress (the current week/month hasn't closed yet), so we
-            # always drop it and read the last *closed* bar. Assumes the
-            # script runs daily, same simple heuristic already used for weekly.
             if interval in ('1wk', '1mo'):
-                if len(df) > 1:
-                    df = df.iloc[:-1]
+                df = _drop_incomplete_bar(df)
             
             if not candle_date:
                 ld = pd.to_datetime(df['date'].iloc[-1]).tz_localize(None)
@@ -352,6 +361,7 @@ def build_confluence_scores(maps, inds, wyckoff_results, top_n=15):
         try:
             ddf = daily_data[t].reset_index(); ddf.columns = [c.lower() for c in ddf.columns]
             wdf = weekly_data[t].reset_index(); wdf.columns = [c.lower() for c in wdf.columns]
+            wdf = _drop_incomplete_bar(wdf)
             if len(ddf) < 20 or len(wdf) < 20: continue
 
             d_rec = compute_dm_recency(ddf, CONF_DAILY_LOOKBACK)
@@ -360,6 +370,7 @@ def build_confluence_scores(maps, inds, wyckoff_results, top_n=15):
             if t in monthly_data:
                 try:
                     mdf = monthly_data[t].reset_index(); mdf.columns = [c.lower() for c in mdf.columns]
+                    mdf = _drop_incomplete_bar(mdf)
                     if len(mdf) >= 20:
                         m_rec = compute_dm_recency(mdf, CONF_MONTHLY_LOOKBACK)
                 except Exception:
