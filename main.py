@@ -608,12 +608,20 @@ def get_shared_style(fg_color):
            positioned) so on narrow screens it wraps to its own line
            instead of overlapping the nav links. */
         .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
-        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        /* margin-left: auto keeps .topbar pinned to the right edge even when it
+           wraps onto its own line on narrow screens. Without this, a lone flex
+           item on a wrapped "space-between" line defaults to flex-start (left),
+           so the toggle would drift to the left instead of staying top-right. */
+        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
         .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
         .section-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
         .section-card table { margin-top: 6px; }
-        .section-card h3 { font-family: var(--font-display); margin-top: 0; }
+        /* Second+ h3 in a card (e.g. "... by Sector" titles following a signals
+           table) need real top spacing to separate them from the table above;
+           only the first h3 in the card should sit flush with no top margin. */
+        .section-card h3 { font-family: var(--font-display); margin-top: 24px; margin-bottom: 8px; }
+        .section-card h3:first-child { margin-top: 0; }
         
         .nav-bar { margin-bottom: 0; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
