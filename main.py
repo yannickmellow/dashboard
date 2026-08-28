@@ -207,12 +207,18 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
     results = {"Tops": [], "Bottoms": []}
     sector_counts = {"Tops": defaultdict(int), "Bottoms": defaultdict(int)}
     tickers = list(ticker_map.keys())
-    # Monthly needs much deeper history than weekly to get a comparable bar
-    # count (12 bars/yr vs 52): 10y of monthly ≈ 120 bars, vs 2y of weekly ≈
-    # 104 bars. Tickers with less than 10y of history (recent IPOs) simply
-    # won't qualify for monthly signals -- same graceful degradation as any
-    # ticker too new for the existing daily/weekly minimum-bar checks.
-    PERIOD_BY_INTERVAL = {'1mo': '10y', '1wk': '2y'}
+    # DM9/13 counting only cares about the CURRENT unbroken streak, not deep
+    # history: _compute_dm_series' "val_reset" subtraction is empirically a
+    # no-op here (verified: TDUp comes out identical to the raw running-streak
+    # counter even across an internal reset), so the count is just "how many
+    # consecutive bars in a row satisfy the 4-bars-back comparison." The code
+    # does have a hard floor of 20 bars (_compute_dm_series returns nothing
+    # below that) -- at exactly 20 bars the max achievable streak is 16,
+    # comfortably covering DM13 (needs >=17 bars to ever be reachable). 2y of
+    # monthly bars (~24) matches weekly's already-proven period, clearing that
+    # floor with a few bars of margin for API quirks or an unusually long
+    # real streak -- no need for years of extra history beyond that.
+    PERIOD_BY_INTERVAL = {'1mo': '2y', '1wk': '2y'}
     period = PERIOD_BY_INTERVAL.get(interval, '6mo')
     data = load_or_fetch_price_data(tickers, interval, period, label)
     candle_date = None
