@@ -874,7 +874,16 @@ def gen_setup_cards(setups, direction):
                 chips += f'<span class="chip">Wyckoff LPS · today</span>'
             else:
                 days = comp[1]
-                when = "today" if days == 0 else f"{days}d ago"
+                # days_since is a BAR count, not a day count -- 5 for a
+                # weekly signal means 5 weeks, not 5 days. Unit follows the
+                # timeframe named at the start of the label.
+                if label.startswith("Weekly"):
+                    unit = "w"
+                elif label.startswith("Monthly"):
+                    unit = "mo"
+                else:
+                    unit = "d"
+                when = "today" if days == 0 else f"{days}{unit} ago"
                 chips += f'<span class="chip">{label} · {when}</span>'
         link = f"https://www.tradingview.com/chart/?symbol={r['ticker']}"
         cards += f"""
