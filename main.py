@@ -578,7 +578,11 @@ def get_shared_style(fg_color):
             }
         }
 
-        body { font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        /* position: relative so the absolutely-positioned .theme-toggle anchors
+           to body's own box (top:0/right:0 = flush with body's content edge)
+           rather than the raw viewport — keeps it aligned consistently across
+           the 20px desktop and 10px mobile body margins below. */
+        body { position: relative; font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
         h1 { display: flex; align-items: baseline; gap: 12px; letter-spacing: -0.01em; }
         
         .date-subtitle { margin-top: 6px; font-size: 0.95em; opacity: 0.8; margin-bottom: 12px; }
@@ -603,18 +607,20 @@ def get_shared_style(fg_color):
         table.sortable th { cursor: pointer; color: var(--text-color); font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; border-bottom: 2px solid var(--link-color); background-color: var(--th-bg); }
         table.sortable th:hover { color: var(--link-color); }
         
-        /* Top-right bar: market hours banner + dark mode toggle.
-           Lives in a flex .page-header alongside .nav-bar (not absolutely
-           positioned) so on narrow screens it wraps to its own line
-           instead of overlapping the nav links. */
+        /* Nav links (top-left) with the market-hours banner wrapping to its own
+           line underneath on narrow screens — .page-header/.topbar are plain
+           in-flow flex, no absolute positioning, so nothing here ever overlaps
+           the nav links. */
         .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
-        /* margin-left: auto keeps .topbar pinned to the right edge even when it
-           wraps onto its own line on narrow screens. Without this, a lone flex
-           item on a wrapped "space-between" line defaults to flex-start (left),
-           so the toggle would drift to the left instead of staying top-right. */
-        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
-        .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
+        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
+        /* Dark-mode toggle is deliberately taken out of the .page-header flex
+           flow entirely and pinned to the page's top-right corner instead, so
+           it stays there regardless of how nav/banner wrap on narrow screens.
+           It's a single small icon (not the full banner), so unlike the old
+           topbar-was-absolute bug, there's no realistic width for it to
+           overlap the nav links. */
+        .theme-toggle { position: absolute; top: 0; right: 0; cursor: pointer; font-size: 24px; user-select: none; }
         .section-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
         .section-card table { margin-top: 6px; }
         /* Second+ h3 in a card (e.g. "... by Sector" titles following a signals
@@ -823,13 +829,16 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
             '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">')
     updated_at = f'<div class="update-footer">Last updated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}</div>'
     
-    # Common top-right bar: market hours banner + dark mode toggle
+    # Market-hours banner: sits in-flow next to nav, wraps below it on mobile.
     toggle = (
         f'<div class="topbar">'
         f'<span class="market-banner">{get_market_hours_banner()}</span>'
-        f'<div id="theme-toggle" class="theme-toggle">🌙</div>'
         f'</div>'
     )
+    # Dark-mode toggle: rendered separately (not nested in .page-header) since
+    # it's position:absolute and pinned to the page's top-right corner —
+    # independent of how nav/banner lay out or wrap.
+    theme_toggle = '<div id="theme-toggle" class="theme-toggle">🌙</div>'
     nav = lambda active: (
         '<div class="nav-bar">'
         f'<a href="index.html" class="nav-link{" active-link" if active=="home" else ""}">Home</a>'
@@ -847,6 +856,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
     bearish_setups = [r for r in top_setups if r["direction"] == "Bearish"]
 
     html_home = f"""<html><head>{meta}<title>Dashboard</title>{style}</head><body>
+    {theme_toggle}
     <div class="page-header">{nav("home")}{toggle}</div>
     <h1>US Signals Dashboard</h1><div class="date-subtitle">{date_str}</div>
 
@@ -880,6 +890,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
 
     # --- DEMARK HTML (formerly index.html) ---
     html_dm = f"""<html><head>{meta}<title>DeMark</title>{style}</head><body>
+    {theme_toggle}
     <div class="page-header">{nav("demark")}{toggle}</div>
     <h1>DeMark Signals</h1><div class="date-subtitle">{date_str}</div>
     
@@ -917,6 +928,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
         )
 
     html_w = f"""<html><head>{meta}<title>Wyckoff</title>{style}</head><body>
+    {theme_toggle}
     <div class="page-header">{nav("wyckoff")}{toggle}</div>
     <h1>Wyckoff LPS</h1><div class="date-subtitle">{date_str}</div>
     <p style="opacity:0.75; font-size:0.9em; margin-top:-8px;">Last Point of Support: a pullback to a prior volume-confirmed breakout, on light volume, reacting back up.</p>
