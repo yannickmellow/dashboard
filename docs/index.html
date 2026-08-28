@@ -52,7 +52,11 @@
             }
         }
 
-        body { font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        /* position: relative so the absolutely-positioned .theme-toggle anchors
+           to body's own box (top:0/right:0 = flush with body's content edge)
+           rather than the raw viewport — keeps it aligned consistently across
+           the 20px desktop and 10px mobile body margins below. */
+        body { position: relative; font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
         h1 { display: flex; align-items: baseline; gap: 12px; letter-spacing: -0.01em; }
         
         .date-subtitle { margin-top: 6px; font-size: 0.95em; opacity: 0.8; margin-bottom: 12px; }
@@ -77,17 +81,27 @@
         table.sortable th { cursor: pointer; color: var(--text-color); font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; border-bottom: 2px solid var(--link-color); background-color: var(--th-bg); }
         table.sortable th:hover { color: var(--link-color); }
         
-        /* Top-right bar: market hours banner + dark mode toggle.
-           Lives in a flex .page-header alongside .nav-bar (not absolutely
-           positioned) so on narrow screens it wraps to its own line
-           instead of overlapping the nav links. */
+        /* Nav links (top-left) with the market-hours banner wrapping to its own
+           line underneath on narrow screens — .page-header/.topbar are plain
+           in-flow flex, no absolute positioning, so nothing here ever overlaps
+           the nav links. */
         .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
         .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .theme-toggle { cursor: pointer; font-size: 24px; user-select: none; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
+        /* Dark-mode toggle is deliberately taken out of the .page-header flex
+           flow entirely and pinned to the page's top-right corner instead, so
+           it stays there regardless of how nav/banner wrap on narrow screens.
+           It's a single small icon (not the full banner), so unlike the old
+           topbar-was-absolute bug, there's no realistic width for it to
+           overlap the nav links. */
+        .theme-toggle { position: absolute; top: 0; right: 0; cursor: pointer; font-size: 24px; user-select: none; }
         .section-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
         .section-card table { margin-top: 6px; }
-        .section-card h3 { font-family: var(--font-display); margin-top: 0; }
+        /* Second+ h3 in a card (e.g. "... by Sector" titles following a signals
+           table) need real top spacing to separate them from the table above;
+           only the first h3 in the card should sit flush with no top margin. */
+        .section-card h3 { font-family: var(--font-display); margin-top: 24px; margin-bottom: 8px; }
+        .section-card h3:first-child { margin-top: 0; }
         
         .nav-bar { margin-bottom: 0; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
@@ -221,7 +235,8 @@
     });
     </script>
     </head><body>
-    <div class="page-header"><div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div><div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span><div id="theme-toggle" class="theme-toggle">🌙</div></div></div>
+    <div id="theme-toggle" class="theme-toggle">🌙</div>
+    <div class="page-header"><div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div><div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span></div></div>
     <h1>US Signals Dashboard</h1><div class="date-subtitle">Signals triggered on Thursday, Aug 27, 2026 (as of NY close)</div>
 
     <div class="regime-strip">
@@ -244,93 +259,63 @@
             
         <div class="setup-card">
             <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=UP" target="_blank" class="setup-ticker bull">UP</a>
+                <span class="setup-price">$4.96</span>
+                <span class="setup-score bull" style="color:var(--bull);">8.32</span>
+            </div>
+            <div class="setup-industry">Airports & Air Services</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:48%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Bottom · 2d ago</span><span class="chip">Weekly DM9 Bottom · today</span><span class="chip">Daily DM9 Bottom · 8d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=EH" target="_blank" class="setup-ticker bull">EH</a>
+                <span class="setup-price">$4.66</span>
+                <span class="setup-score bull" style="color:var(--bull);">7.80</span>
+            </div>
+            <div class="setup-industry">Aerospace & Defense</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Bottom · 2d ago</span><span class="chip">Weekly DM9 Bottom · 5d ago</span><span class="chip">Daily DM9 Bottom · today</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=SITC" target="_blank" class="setup-ticker bull">SITC</a>
+                <span class="setup-price">$2.98</span>
+                <span class="setup-score bull" style="color:var(--bull);">7.80</span>
+            </div>
+            <div class="setup-industry">REIT - Retail</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM13 Bottom · 4d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=NAGE" target="_blank" class="setup-ticker bull">NAGE</a>
+                <span class="setup-price">$3.21</span>
+                <span class="setup-score bull" style="color:var(--bull);">7.50</span>
+            </div>
+            <div class="setup-industry">Biotechnology</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:43%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM13 Bottom · 5d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
                 <a href="https://www.tradingview.com/chart/?symbol=ARRY" target="_blank" class="setup-ticker bull">ARRY</a>
                 <span class="setup-price">$4.67</span>
                 <span class="setup-score bull" style="color:var(--bull);">7.26</span>
             </div>
             <div class="setup-industry">Solar</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:60%;"></div></div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:42%;"></div></div>
             <div class="setup-chips"><span class="chip">Weekly DM13 Bottom · 1d ago</span><span class="chip">Daily DM13 Bottom · 2d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=SGML" target="_blank" class="setup-ticker bull">SGML</a>
-                <span class="setup-price">$12.61</span>
-                <span class="setup-score bull" style="color:var(--bull);">6.60</span>
+                <a href="https://www.tradingview.com/chart/?symbol=TU" target="_blank" class="setup-ticker bull">TU</a>
+                <span class="setup-price">$9.76</span>
+                <span class="setup-score bull" style="color:var(--bull);">6.80</span>
             </div>
-            <div class="setup-industry">Other Industrial Metals & Mining</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:55%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Bottom · 4d ago</span><span class="chip">Wyckoff LPS · today</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=STUB" target="_blank" class="setup-ticker bull">STUB</a>
-                <span class="setup-price">$6.55</span>
-                <span class="setup-score bull" style="color:var(--bull);">6.36</span>
-            </div>
-            <div class="setup-industry">Internet Retail</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:53%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · today</span><span class="chip">Daily DM13 Bottom · 2d ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=RUN" target="_blank" class="setup-ticker bull">RUN</a>
-                <span class="setup-price">$9.06</span>
-                <span class="setup-score bull" style="color:var(--bull);">6.30</span>
-            </div>
-            <div class="setup-industry">Solar</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:52%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Bottom · 1d ago</span><span class="chip">Daily DM9 Bottom · today</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=STAA" target="_blank" class="setup-ticker bull">STAA</a>
-                <span class="setup-price">$22.39</span>
-                <span class="setup-score bull" style="color:var(--bull);">6.05</span>
-            </div>
-            <div class="setup-industry">Medical Instruments & Supplies</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:50%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Bottom · today</span><span class="chip">Daily DM9 Bottom · today</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=LFMD" target="_blank" class="setup-ticker bull">LFMD</a>
-                <span class="setup-price">$3.26</span>
-                <span class="setup-score bull" style="color:var(--bull);">5.84</span>
-            </div>
-            <div class="setup-industry">Health Information Services</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:49%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · 2d ago</span><span class="chip">Daily DM13 Bottom · 3d ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=SUPV" target="_blank" class="setup-ticker bull">SUPV</a>
-                <span class="setup-price">$8.40</span>
-                <span class="setup-score bull" style="color:var(--bull);">5.76</span>
-            </div>
-            <div class="setup-industry">Banks - Regional</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:48%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · today</span><span class="chip">Daily DM13 Bottom · 7d ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=WD" target="_blank" class="setup-ticker bull">WD</a>
-                <span class="setup-price">$40.28</span>
-                <span class="setup-score bull" style="color:var(--bull);">5.72</span>
-            </div>
-            <div class="setup-industry">Mortgage Finance</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:48%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · today</span><span class="chip">Daily DM13 Bottom · 3d ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=LX" target="_blank" class="setup-ticker bull">LX</a>
-                <span class="setup-price">$1.15</span>
-                <span class="setup-score bull" style="color:var(--bull);">5.60</span>
-            </div>
-            <div class="setup-industry">Credit Services</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:47%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Bottom · 2d ago</span><span class="chip">Daily DM13 Bottom · 5d ago</span></div>
+            <div class="setup-industry">Telecom Services</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:39%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM9 Bottom · 5d ago</span></div>
         </div>
         </div>
         <div class="setups-col">
@@ -338,65 +323,95 @@
             
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=CMBT" target="_blank" class="setup-ticker bear">CMBT</a>
-                <span class="setup-price">$18.28</span>
-                <span class="setup-score bear" style="color:var(--bear);">6.24</span>
+                <a href="https://www.tradingview.com/chart/?symbol=MRK" target="_blank" class="setup-ticker bear">MRK</a>
+                <span class="setup-price">$149.54</span>
+                <span class="setup-score bear" style="color:var(--bear);">9.47</span>
+            </div>
+            <div class="setup-industry">Drug Manufacturers - General</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:54%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Top · today</span><span class="chip">Weekly DM9 Top · 2d ago</span><span class="chip">Daily DM13 Top · 2d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=ET" target="_blank" class="setup-ticker bear">ET</a>
+                <span class="setup-price">$21.38</span>
+                <span class="setup-score bear" style="color:var(--bear);">8.53</span>
             </div>
             <div class="setup-industry">Oil & Gas Midstream</div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:52%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · 3d ago</span></div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:49%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Top · today</span><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM9 Top · 5d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=NAT" target="_blank" class="setup-ticker bear">NAT</a>
-                <span class="setup-price">$6.76</span>
-                <span class="setup-score bear" style="color:var(--bear);">6.24</span>
+                <a href="https://www.tradingview.com/chart/?symbol=CAKE" target="_blank" class="setup-ticker bear">CAKE</a>
+                <span class="setup-price">$110.09</span>
+                <span class="setup-score bear" style="color:var(--bear);">8.50</span>
             </div>
-            <div class="setup-industry">Oil & Gas Midstream</div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:52%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Top · today</span><span class="chip">Daily DM9 Top · 6d ago</span></div>
+            <div class="setup-industry">Restaurants</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:49%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Top · today</span><span class="chip">Weekly DM13 Top · 2d ago</span><span class="chip">Daily DM13 Top · 10d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=NIQ" target="_blank" class="setup-ticker bear">NIQ</a>
-                <span class="setup-price">$19.07</span>
-                <span class="setup-score bear" style="color:var(--bear);">6.20</span>
+                <a href="https://www.tradingview.com/chart/?symbol=CLMT" target="_blank" class="setup-ticker bear">CLMT</a>
+                <span class="setup-price">$45.77</span>
+                <span class="setup-score bear" style="color:var(--bear);">7.79</span>
             </div>
-            <div class="setup-industry">Closed-End Fund - Debt</div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:52%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Top · 2d ago</span><span class="chip">Daily DM13 Top · today</span></div>
+            <div class="setup-industry">Specialty Chemicals</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:45%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Top · 3d ago</span><span class="chip">Weekly DM9 Top · 1d ago</span><span class="chip">Daily DM9 Top · 5d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=CVI" target="_blank" class="setup-ticker bear">CVI</a>
-                <span class="setup-price">$39.76</span>
-                <span class="setup-score bear" style="color:var(--bear);">6.05</span>
+                <a href="https://www.tradingview.com/chart/?symbol=PSX" target="_blank" class="setup-ticker bear">PSX</a>
+                <span class="setup-price">$239.81</span>
+                <span class="setup-score bear" style="color:var(--bear);">7.75</span>
             </div>
             <div class="setup-industry">Oil & Gas Refining & Marketing</div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:50%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM13 Top · today</span></div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:45%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Top · today</span><span class="chip">Weekly DM9 Top · today</span><span class="chip">Daily DM9 Top · 5d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=FRPT" target="_blank" class="setup-ticker bear">FRPT</a>
-                <span class="setup-price">$72.78</span>
-                <span class="setup-score bear" style="color:var(--bear);">6.00</span>
+                <a href="https://www.tradingview.com/chart/?symbol=OII" target="_blank" class="setup-ticker bear">OII</a>
+                <span class="setup-price">$51.21</span>
+                <span class="setup-score bear" style="color:var(--bear);">7.42</span>
             </div>
-            <div class="setup-industry">Packaged Foods</div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:50%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Top · today</span><span class="chip">Daily DM13 Top · 5d ago</span></div>
+            <div class="setup-industry">Oil & Gas Equipment & Services</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:43%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Top · today</span><span class="chip">Weekly DM9 Top · 2d ago</span><span class="chip">Daily DM9 Top · 5d ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=ABT" target="_blank" class="setup-ticker bear">ABT</a>
-                <span class="setup-price">$111.59</span>
-                <span class="setup-score bear" style="color:var(--bear);">5.85</span>
+                <a href="https://www.tradingview.com/chart/?symbol=VCTR" target="_blank" class="setup-ticker bear">VCTR</a>
+                <span class="setup-price">$121.13</span>
+                <span class="setup-score bear" style="color:var(--bear);">7.33</span>
             </div>
-            <div class="setup-industry">Medical Devices</div>
-            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:49%;"></div></div>
-            <div class="setup-chips"><span class="chip">Weekly DM13 Top · 1d ago</span><span class="chip">Daily DM13 Top · 4d ago</span></div>
+            <div class="setup-industry">Asset Management</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:42%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Top · today</span><span class="chip">Weekly DM9 Top · 1d ago</span><span class="chip">Daily DM9 Top · 10d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=ACT" target="_blank" class="setup-ticker bear">ACT</a>
+                <span class="setup-price">$49.04</span>
+                <span class="setup-score bear" style="color:var(--bear);">7.26</span>
+            </div>
+            <div class="setup-industry">Insurance - Specialty</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:42%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM9 Top · 2d ago</span><span class="chip">Weekly DM9 Top · 2d ago</span><span class="chip">Daily DM9 Top · 8d ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=APGE" target="_blank" class="setup-ticker bear">APGE</a>
+                <span class="setup-price">$134.96</span>
+                <span class="setup-score bear" style="color:var(--bear);">7.00</span>
+            </div>
+            <div class="setup-industry">Biotechnology</div>
+            <div class="score-bar-track"><div class="score-bar-fill bear" style="width:40%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Top · today</span><span class="chip">Weekly DM13 Top · 2d ago</span></div>
         </div>
         </div>
     </div>
     <p style="opacity:0.6; font-size:0.85em; margin-top:20px;">Score = weighted sum of confirming signals (weekly/daily DeMark + Wyckoff LPS) across timeframes, with a stacking bonus for multiple distinct signal types and a tradeability multiplier by price. See <a href="demark.html" class="nav-link" style="font-size:1em;">DeMark</a> and <a href="wyckoff.html" class="nav-link" style="font-size:1em;">Wyckoff</a> tabs for the full underlying scans.</p>
-    <div class="update-footer">Last updated: 2026-08-28 05:07 UTC</div></body></html>
+    <div class="update-footer">Last updated: 2026-08-28 12:14 UTC</div></body></html>
