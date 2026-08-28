@@ -207,7 +207,13 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
     results = {"Tops": [], "Bottoms": []}
     sector_counts = {"Tops": defaultdict(int), "Bottoms": defaultdict(int)}
     tickers = list(ticker_map.keys())
-    period = '2y' if interval == '1wk' else '6mo'
+    # Monthly needs much deeper history than weekly to get a comparable bar
+    # count (12 bars/yr vs 52): 10y of monthly ≈ 120 bars, vs 2y of weekly ≈
+    # 104 bars. Tickers with less than 10y of history (recent IPOs) simply
+    # won't qualify for monthly signals -- same graceful degradation as any
+    # ticker too new for the existing daily/weekly minimum-bar checks.
+    PERIOD_BY_INTERVAL = {'1mo': '10y', '1wk': '2y'}
+    period = PERIOD_BY_INTERVAL.get(interval, '6mo')
     data = load_or_fetch_price_data(tickers, interval, period, label)
     candle_date = None
     
@@ -217,16 +223,14 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
             df = df.reset_index()
             df.columns = [c.lower() for c in df.columns]
             
-            # --- FIX FOR FALSE WEEKLY SIGNALS ---
-            # If Weekly, we must ensure we aren't reading the current "in-progress" week
-            # unless it is Friday after close (which we approximate here)
-            if interval == '1wk':
-                last_date = pd.to_datetime(df['date'].iloc[-1])
-                # Simple check: if last date is within last 3 days, it might be incomplete.
-                # Ideally, just drop the last row if we are scanning mid-week.
-                # Assuming script runs daily:
+            # --- FIX FOR FALSE WEEKLY/MONTHLY SIGNALS ---
+            # For weekly or monthly bars, the most recent bar is still
+            # in-progress (the current week/month hasn't closed yet), so we
+            # always drop it and read the last *closed* bar. Assumes the
+            # script runs daily, same simple heuristic already used for weekly.
+            if interval in ('1wk', '1mo'):
                 if len(df) > 1:
-                    df = df.iloc[:-1] # Always look at the last *closed* week
+                    df = df.iloc[:-1]
             
             if not candle_date:
                 ld = pd.to_datetime(df['date'].iloc[-1]).tz_localize(None)
@@ -275,7 +279,12 @@ def scan_wyckoff(ticker_map, industry_map):
 # --- Confluence tuning knobs ---
 CONF_DAILY_LOOKBACK = 10    # trading days a daily DM signal still "counts" for
 CONF_WEEKLY_LOOKBACK = 6    # weekly bars a weekly DM signal still "counts" for
-CONF_PTS = {"weekly13": 3.0, "weekly9": 2.0, "daily13": 2.0, "daily9": 1.0, "wyckoff": 2.0}
+CONF_MONTHLY_LOOKBACK = 3   # monthly bars a monthly DM signal still "counts" for (~1 quarter)
+# NOTE: monthly13/monthly9 set equal to weekly for now as a placeholder, not a
+# considered judgment -- confluence weighting overall is flagged for a proper
+# empirical pass later via analyze_signals.py once signal_log.csv has enough
+# history (including monthly rows) to compare hit rates across signal types.
+CONF_PTS = {"monthly13": 3.0, "monthly9": 2.0, "weekly13": 3.0, "weekly9": 2.0, "daily13": 2.0, "daily9": 1.0, "wyckoff": 2.0}
 CONF_STACK_BONUS = 1.5      # bonus per additional distinct signal type, same direction
 # Tradeability multiplier: penalize sub-$1 (illiquid/manipulated), boost the
 # $1-$50 range (sizeable for a small account), neutral above that.
@@ -300,10 +309,19 @@ def build_confluence_scores(maps, inds, wyckoff_results, top_n=15):
     """
     daily_cache = os.path.join("cache", "price_cache_1D.pkl")
     weekly_cache = os.path.join("cache", "price_cache_1W.pkl")
+    monthly_cache = os.path.join("cache", "price_cache_1M.pkl")
     if not (os.path.exists(daily_cache) and os.path.exists(weekly_cache)):
         return []
     with open(daily_cache, "rb") as f: daily_data = pickle.load(f)
     with open(weekly_cache, "rb") as f: weekly_data = pickle.load(f)
+    # Monthly is treated as optional/non-fatal: a ticker missing from it (e.g.
+    # not enough price history for a meaningful monthly count, or the monthly
+    # scan hasn't run yet) still scores normally on daily+weekly -- it just
+    # doesn't get a monthly component, same graceful-degradation pattern as
+    # elsewhere in this file rather than dropping the ticker entirely.
+    monthly_data = {}
+    if os.path.exists(monthly_cache):
+        with open(monthly_cache, "rb") as f: monthly_data = pickle.load(f)
 
     wyckoff_by_ticker = {row[0]: row for row in wyckoff_results}  # row[5]=days_since (always 0/today)
 
@@ -317,9 +335,26 @@ def build_confluence_scores(maps, inds, wyckoff_results, top_n=15):
 
             d_rec = compute_dm_recency(ddf, CONF_DAILY_LOOKBACK)
             w_rec = compute_dm_recency(wdf, CONF_WEEKLY_LOOKBACK)
+            m_rec = {"top9": None, "top13": None, "bot9": None, "bot13": None}
+            if t in monthly_data:
+                try:
+                    mdf = monthly_data[t].reset_index(); mdf.columns = [c.lower() for c in mdf.columns]
+                    if len(mdf) >= 20:
+                        m_rec = compute_dm_recency(mdf, CONF_MONTHLY_LOOKBACK)
+                except Exception:
+                    pass
             has_wyckoff = t in wyckoff_by_ticker
 
             bull_components, bear_components = [], []
+
+            if m_rec["bot13"] is not None:
+                bull_components.append(("Monthly DM13 Bottom", m_rec["bot13"], CONF_PTS["monthly13"] * _decay(m_rec["bot13"], CONF_MONTHLY_LOOKBACK)))
+            elif m_rec["bot9"] is not None:
+                bull_components.append(("Monthly DM9 Bottom", m_rec["bot9"], CONF_PTS["monthly9"] * _decay(m_rec["bot9"], CONF_MONTHLY_LOOKBACK)))
+            if m_rec["top13"] is not None:
+                bear_components.append(("Monthly DM13 Top", m_rec["top13"], CONF_PTS["monthly13"] * _decay(m_rec["top13"], CONF_MONTHLY_LOOKBACK)))
+            elif m_rec["top9"] is not None:
+                bear_components.append(("Monthly DM9 Top", m_rec["top9"], CONF_PTS["monthly9"] * _decay(m_rec["top9"], CONF_MONTHLY_LOOKBACK)))
 
             if w_rec["bot13"] is not None:
                 bull_components.append(("Weekly DM13 Bottom", w_rec["bot13"], CONF_PTS["weekly13"] * _decay(w_rec["bot13"], CONF_WEEKLY_LOOKBACK)))
@@ -786,8 +821,12 @@ def gen_sec_table(title, counts):
     return h + "</table>"
 
 # Normalization ceiling for the confluence score bar (theoretical rough max:
-# weekly13 + daily13 + wyckoff + 2x stack bonus, times the top price multiplier)
-CONF_SCORE_BAR_MAX = 12.0
+# monthly13 + weekly13 + daily13 + wyckoff = 10.0 raw, + stack bonus 1.5x3
+# additional signal types = 4.5, = 14.5, x1.2 top price multiplier = 17.4).
+# Note: bearish max is still lower (~13.2) since Wyckoff LPS is bull-only --
+# the known asymmetric-ceiling issue persists, just less extreme than before
+# (monthly adds equally to both sides, narrowing the bull/bear gap somewhat).
+CONF_SCORE_BAR_MAX = 17.4
 
 def gen_setup_cards(setups, direction):
     cls = "bull" if direction == "Bullish" else "bear"
@@ -819,7 +858,7 @@ def gen_setup_cards(setups, direction):
         </div>"""
     return cards
 
-def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str):
+def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_setups, date_str):
     f_val, f_prev, f_date = fg
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
@@ -900,6 +939,7 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
         <tr><th>Period</th><th>Bottoms</th><th>Tops</th></tr>
         <tr><td><strong>Daily</strong></td><td>{len(daily["Bottoms"])}</td><td>{len(daily["Tops"])}</td></tr>
         <tr><td><strong>Weekly</strong></td><td>{len(weekly["Bottoms"])}</td><td>{len(weekly["Tops"])}</td></tr>
+        <tr><td><strong>Monthly</strong></td><td>{len(monthly["Bottoms"])}</td><td>{len(monthly["Tops"])}</td></tr>
     </table>
     </div>
     
@@ -910,6 +950,10 @@ def write_reports(daily, weekly, d_sec, w_sec, fg, wyckoff, top_setups, date_str
     <div class="row">
         <div class="column"><div class="section-card"><h3>Weekly Bottoms</h3>{gen_table(weekly["Bottoms"])}{gen_sec_table("Weekly Bottoms by Sector", w_sec["Bottoms"])}</div></div>
         <div class="column"><div class="section-card"><h3>Weekly Tops</h3>{gen_table(weekly["Tops"])}{gen_sec_table("Weekly Tops by Sector", w_sec["Tops"])}</div></div>
+    </div>
+    <div class="row">
+        <div class="column"><div class="section-card"><h3>Monthly Bottoms</h3>{gen_table(monthly["Bottoms"])}{gen_sec_table("Monthly Bottoms by Sector", m_sec["Bottoms"])}</div></div>
+        <div class="column"><div class="section-card"><h3>Monthly Tops</h3>{gen_table(monthly["Tops"])}{gen_sec_table("Monthly Tops by Sector", m_sec["Tops"])}</div></div>
     </div>
     {updated_at}</body></html>"""
     with open("docs/demark.html", "w", encoding="utf-8") as f: f.write(html_dm)
@@ -946,6 +990,14 @@ def main():
     # Run Scans
     daily, d_s, d_date = scan_timeframe(maps, inds, "1D", "1d")
     weekly, w_s, _ = scan_timeframe(maps, inds, "1W", "1wk")
+    # Monthly is new/less proven than daily+weekly, so it's wrapped the same
+    # defensive way as signal logging below: a failure here must never be
+    # able to block daily/weekly/Wyckoff from publishing.
+    try:
+        monthly, m_s, _ = scan_timeframe(maps, inds, "1M", "1mo")
+    except Exception as e:
+        print(f"WARNING: monthly scan failed, continuing without it: {e}")
+        monthly, m_s = {"Tops": [], "Bottoms": []}, {"Tops": defaultdict(int), "Bottoms": defaultdict(int)}
     wyckoff = scan_wyckoff(maps, inds)
     all_scores = build_confluence_scores(maps, inds, wyckoff, top_n=None)
     top_setups = all_scores[:15]
@@ -969,6 +1021,6 @@ def main():
         ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
     except: ds = f"Signals triggered on {d_date} (as of NY close)"
     
-    write_reports(daily, weekly, d_s, w_s, fg, wyckoff, top_setups, ds)
+    write_reports(daily, weekly, monthly, d_s, w_s, m_s, fg, wyckoff, top_setups, ds)
 
 if __name__ == "__main__": main()
