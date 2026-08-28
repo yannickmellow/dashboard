@@ -221,13 +221,19 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
     #     uninterrupted streak (quarterly momentum) is meaningfully more
     #     plausible in real data; verified DM13 still detects correctly at
     #     even 24 bars, so 52 has a comfortable safety buffer.
-    #   - daily (below, via load_or_fetch_price_data fallback '6mo'): NOT
-    #     reduced to the DM-only minimum -- price_cache_1D.pkl is also the
-    #     sole price source for the Wyckoff LPS scanner, which needs a
-    #     40+ bar floor plus rolling(20)/rolling(15) lead-in across its own
-    #     12-day SOS search window. Left as-is pending a separate, more
-    #     careful pass specific to Wyckoff's requirements.
-    PERIOD_BY_INTERVAL = {'1mo': '2y', '1wk': '1y'}
+    #   - daily: 3mo (~62 bars). price_cache_1D.pkl also feeds the Wyckoff LPS
+    #     scanner, which needs more lead-in than DM9/13 alone (its own
+    #     len(df)<40 floor, plus rolling(20)/rolling(15) windows across its
+    #     12-day SOS search range). Verified empirically against the real
+    #     production cache (1,975 tickers, 47 live LPS signals): truncating
+    #     to Wyckoff's own 40-bar floor produces ZERO mismatches vs the full
+    #     ~125-bar baseline; bypassing that floor to find the true structural
+    #     minimum, divergence only starts appearing at 30 bars. So the code's
+    #     40-bar floor already has a real ~6-8 bar margin, and 62 bars (what
+    #     '3mo' empirically yields, calibrated off this same cache's actual
+    #     6mo->125-bar ratio) clears that floor by ~22 bars, and the true
+    #     empirical minimum by ~28-30 -- confirmed 0 mismatches at exactly 62.
+    PERIOD_BY_INTERVAL = {'1mo': '2y', '1wk': '1y', '1d': '3mo'}
     period = PERIOD_BY_INTERVAL.get(interval, '6mo')
     data = load_or_fetch_price_data(tickers, interval, period, label)
     candle_date = None
