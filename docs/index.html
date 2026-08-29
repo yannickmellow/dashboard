@@ -107,6 +107,25 @@
            only the first h3 in the card should sit flush with no top margin. */
         .section-card h3 { font-family: var(--font-display); margin-top: 24px; margin-bottom: 8px; }
         .section-card h3:first-child { margin-top: 0; }
+
+        /* --- Sector Rotation page --- */
+        .theme-group { margin-bottom: 16px; }
+        .theme-group:last-child { margin-bottom: 0; }
+        .theme-group.macro { border-bottom: 1px dashed var(--border-color); padding-bottom: 14px; margin-bottom: 22px; }
+        .theme-heading { font-family: var(--font-mono); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .theme-count { opacity: 0.6; }
+        .tile-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+        .tile { border-radius: 6px; padding: 8px 9px; border: 1px solid var(--border-color); min-height: 54px; }
+        .tile-ticker { font-family: var(--font-mono); font-weight: 500; font-size: 0.95em; }
+        .tile-phase { font-family: var(--font-mono); font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; margin-top: 2px; }
+        .tile-chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+        .mini-chip { font-family: var(--font-mono); font-size: 0.62em; padding: 1px 5px; border-radius: 8px; }
+        .mini-bull { background: rgba(0,0,0,0.25); color: var(--bull); }
+        .mini-bear { background: rgba(0,0,0,0.25); color: var(--bear); }
+        .rrg-toggle { font-family: var(--font-mono); font-size: 0.8em; color: var(--link-color); cursor: pointer; user-select: none; margin: 4px 0 14px; display: inline-block; }
+        .rrg-panel { display: none; margin-bottom: 16px; }
+        .rrg-panel.open { display: block; }
+        .quad-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
         
         .nav-bar { margin-bottom: 0; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
@@ -237,11 +256,20 @@
                 });
             });
         });
+
+        const rrgToggle = document.getElementById("rrg-toggle");
+        if (rrgToggle) {
+            rrgToggle.addEventListener("click", () => {
+                const panel = document.getElementById("rrg-panel");
+                const isOpen = panel.classList.toggle("open");
+                rrgToggle.textContent = isOpen ? "Hide full rotation chart ▲" : "Show full rotation chart ▼";
+            });
+        }
     });
     </script>
     </head><body>
     <div id="theme-toggle" class="theme-toggle">🌙</div>
-    <div class="page-header"><div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a></div><div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span></div></div>
+    <div class="page-header"><div class="nav-bar"><a href="index.html" class="nav-link active-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a><a href="rotation.html" class="nav-link">Rotation</a></div><div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span></div></div>
     <h1>US Signals Dashboard</h1><div class="date-subtitle">Signals triggered on Thursday, Aug 27, 2026 (as of NY close)</div>
 
     <div class="regime-strip">
@@ -251,8 +279,8 @@
         </div>
         <div class="regime-row">
             <span class="regime-label">Breadth</span>
-            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:63%;"></div><div class="breadth-bear-seg" style="width:37%;"></div></div>
-            <span class="breadth-count">37 bottoms / 22 tops (daily)</span>
+            <div class="breadth-bar"><div class="breadth-bull-seg" style="width:64%;"></div><div class="breadth-bear-seg" style="width:36%;"></div></div>
+            <span class="breadth-count">37 bottoms / 21 tops (daily)</span>
         </div>
         <img src="fg_trend.png" class="fg-chart" style="max-width: 420px; display:block; margin:10px 0 0 0; border-radius:4px;">
     </div>
@@ -274,6 +302,16 @@
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=SITC" target="_blank" class="setup-ticker bull">SITC</a>
+                <span class="setup-price">$2.99</span>
+                <span class="setup-score bull" style="color:var(--bull);">7.80</span>
+            </div>
+            <div class="setup-industry">REIT - Retail</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM13 Bottom · 4w ago</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
                 <a href="https://www.tradingview.com/chart/?symbol=EH" target="_blank" class="setup-ticker bull">EH</a>
                 <span class="setup-price">$4.66</span>
                 <span class="setup-score bull" style="color:var(--bull);">7.80</span>
@@ -281,16 +319,6 @@
             <div class="setup-industry">Aerospace & Defense</div>
             <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
             <div class="setup-chips"><span class="chip">Monthly DM9 Bottom · 2mo ago</span><span class="chip">Weekly DM9 Bottom · 5w ago</span><span class="chip">Daily DM9 Bottom · today</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=SITC" target="_blank" class="setup-ticker bull">SITC</a>
-                <span class="setup-price">$2.98</span>
-                <span class="setup-score bull" style="color:var(--bull);">7.80</span>
-            </div>
-            <div class="setup-industry">REIT - Retail</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
-            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM13 Bottom · 4w ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
@@ -419,4 +447,4 @@
         </div>
     </div>
     <p style="opacity:0.6; font-size:0.85em; margin-top:20px;">Score = weighted sum of confirming signals (weekly/daily DeMark + Wyckoff LPS) across timeframes, with a stacking bonus for multiple distinct signal types and a tradeability multiplier by price. See <a href="demark.html" class="nav-link" style="font-size:1em;">DeMark</a> and <a href="wyckoff.html" class="nav-link" style="font-size:1em;">Wyckoff</a> tabs for the full underlying scans.</p>
-    <div class="update-footer">Last updated: 2026-08-29 11:48 UTC</div></body></html>
+    <div class="update-footer">Last updated: 2026-08-29 13:13 UTC</div></body></html>

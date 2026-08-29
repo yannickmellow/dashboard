@@ -1,0 +1,280 @@
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet"><title>Rotation</title>
+    <style>
+        :root {
+            --bg-color: #f6f5f2;
+            --bg-elevated: #ffffff;
+            --text-color: #1b1f24;
+            --text-dim: #6b7280;
+            --table-bg: #ffffff;
+            --th-bg: #f0f0f0;
+            --border-color: #dde1e6;
+            --link-color: #007bff;
+            --fg-box-text: #ffffff;
+            --bull: #1f9d55;
+            --bear: #c73e3e;
+            --amber: #b5750a;
+            --font-display: 'Space Grotesk', system-ui, sans-serif;
+            --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+        }
+        
+        [data-theme="dark"] {
+            --bg-color: #0b0e11;
+            --bg-elevated: #12161b;
+            --text-color: #e6e9ec;
+            --text-dim: #8b95a1;
+            --table-bg: #12161b;
+            --th-bg: #1a1f26;
+            --border-color: #232830;
+            --link-color: #66b3ff;
+            --bull: #3ddc84;
+            --bear: #ff5c5c;
+            --amber: #f5a623;
+        }
+
+        /* Default to the OS/browser's color-scheme preference when the person
+           hasn't made an explicit choice via the toggle. :root:not([data-theme="light"])
+           means an explicit manual "light" choice still wins over a dark system
+           preference; the [data-theme="dark"] rule above separately covers an
+           explicit manual "dark" choice overriding a light system preference. */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg-color: #0b0e11;
+                --bg-elevated: #12161b;
+                --text-color: #e6e9ec;
+                --text-dim: #8b95a1;
+                --table-bg: #12161b;
+                --th-bg: #1a1f26;
+                --border-color: #232830;
+                --link-color: #66b3ff;
+                --bull: #3ddc84;
+                --bear: #ff5c5c;
+                --amber: #f5a623;
+            }
+        }
+
+        /* position: relative so the absolutely-positioned .theme-toggle anchors
+           to body's own box (top:0/right:0 = flush with body's content edge)
+           rather than the raw viewport — keeps it aligned consistently across
+           the 20px desktop and 10px mobile body margins below. */
+        body { position: relative; font-family: var(--font-display); margin: 20px; font-size: 16px; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        h1 { display: flex; align-items: baseline; gap: 12px; letter-spacing: -0.01em; }
+        
+        .date-subtitle { margin-top: 6px; font-size: 0.95em; opacity: 0.8; margin-bottom: 12px; }
+        .fg-box { padding: 10px; margin-bottom: 20px; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 1.1em; background-color: #ffc107; color: var(--fg-box-text); }
+        
+        /* Tables */
+        .summary-table { border-collapse: collapse; margin: 20px 0; width: 100%; }
+        .summary-table th, .summary-table td { border: 1px solid var(--border-color); padding: 6px 10px; text-align: center; background-color: var(--table-bg); }
+        .summary-table th { background-color: var(--th-bg); }
+        
+        /* Summary Table Header - NO LINK STYLE */
+        .summary-table th { cursor: default; color: var(--text-color); text-decoration: none; }
+        .summary-table th:hover { color: var(--text-color); }
+
+        .row { display: flex; flex-direction: column; margin-bottom: 30px; }
+        .column { flex: 1; margin: 10px 0; width: 100%; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1em; table-layout: auto; }
+        th, td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; background-color: var(--table-bg); color: var(--text-color); }
+        
+        /* Sortable Headers Only */
+        table.sortable th { cursor: pointer; color: var(--text-color); font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; border-bottom: 2px solid var(--link-color); background-color: var(--th-bg); }
+        table.sortable th:hover { color: var(--link-color); }
+        
+        /* Nav links (top-left) with the market-hours banner wrapping to its own
+           line underneath on narrow screens — .page-header/.topbar are plain
+           in-flow flex, no absolute positioning, so nothing here ever overlaps
+           the nav links. */
+        /* padding-right reserves space for the fixed top-right .theme-toggle
+           so the market-banner (right-aligned via space-between) doesn't
+           render underneath it on wide/desktop viewports where nav+banner
+           fit on one line. On narrow viewports the banner already wraps to
+           its own line below nav, so this has no visible effect there. */
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; padding-right: 44px; }
+        .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
+        /* Dark-mode toggle is deliberately taken out of the .page-header flex
+           flow entirely and pinned to the page's top-right corner instead, so
+           it stays there regardless of how nav/banner wrap on narrow screens.
+           It's a single small icon (not the full banner), so unlike the old
+           topbar-was-absolute bug, there's no realistic width for it to
+           overlap the nav links. */
+        .theme-toggle { position: absolute; top: 0; right: 0; cursor: pointer; font-size: 24px; user-select: none; }
+        .section-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+        .section-card table { margin-top: 6px; }
+        /* Second+ h3 in a card (e.g. "... by Sector" titles following a signals
+           table) need real top spacing to separate them from the table above;
+           only the first h3 in the card should sit flush with no top margin. */
+        .section-card h3 { font-family: var(--font-display); margin-top: 24px; margin-bottom: 8px; }
+        .section-card h3:first-child { margin-top: 0; }
+
+        /* --- Sector Rotation page --- */
+        .theme-group { margin-bottom: 16px; }
+        .theme-group:last-child { margin-bottom: 0; }
+        .theme-group.macro { border-bottom: 1px dashed var(--border-color); padding-bottom: 14px; margin-bottom: 22px; }
+        .theme-heading { font-family: var(--font-mono); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .theme-count { opacity: 0.6; }
+        .tile-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+        .tile { border-radius: 6px; padding: 8px 9px; border: 1px solid var(--border-color); min-height: 54px; }
+        .tile-ticker { font-family: var(--font-mono); font-weight: 500; font-size: 0.95em; }
+        .tile-phase { font-family: var(--font-mono); font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; margin-top: 2px; }
+        .tile-chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+        .mini-chip { font-family: var(--font-mono); font-size: 0.62em; padding: 1px 5px; border-radius: 8px; }
+        .mini-bull { background: rgba(0,0,0,0.25); color: var(--bull); }
+        .mini-bear { background: rgba(0,0,0,0.25); color: var(--bear); }
+        .rrg-toggle { font-family: var(--font-mono); font-size: 0.8em; color: var(--link-color); cursor: pointer; user-select: none; margin: 4px 0 14px; display: inline-block; }
+        .rrg-panel { display: none; margin-bottom: 16px; }
+        .rrg-panel.open { display: block; }
+        .quad-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+        
+        .nav-bar { margin-bottom: 0; }
+        .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
+        .nav-link:hover { text-decoration: underline; opacity: 0.8; }
+        .active-link { color: var(--text-color); text-decoration: none; cursor: default; }
+        
+        .update-footer { margin-top: 50px; font-size: 0.85em; color: #888; text-align: center; border-top: 1px solid var(--border-color); padding-top: 10px; }
+
+        /* Arrows Hidden By Default */
+        .sortable th::after { content: ""; margin-left: 5px; }
+        .sortable th.asc::after { content: " ▲"; font-size: 0.8em; }
+        .sortable th.desc::after { content: " ▼"; font-size: 0.8em; }
+
+        /* --- Front page: regime strip + top setups --- */
+        .ticker-mono { font-family: var(--font-mono); }
+
+        .regime-strip { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; }
+        .regime-row { display: flex; align-items: center; gap: 14px; margin: 10px 0; flex-wrap: wrap; }
+        .regime-label { font-family: var(--font-mono); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); width: 90px; flex-shrink: 0; }
+        .regime-value { font-family: var(--font-mono); font-weight: 600; }
+        .breadth-bar { flex: 1; min-width: 140px; height: 10px; border-radius: 5px; overflow: hidden; display: flex; background: var(--border-color); }
+        .breadth-bull-seg { background-color: var(--bull); height: 100%; }
+        .breadth-bear-seg { background-color: var(--bear); height: 100%; }
+        .breadth-count { font-family: var(--font-mono); font-size: 0.85em; color: var(--text-dim); white-space: nowrap; }
+
+        .setups-heading { font-family: var(--font-display); font-size: 1.3em; font-weight: 700; margin: 6px 0 14px 0; }
+        .setups-columns { display: flex; flex-direction: column; gap: 20px; }
+        .setups-col { flex: 1; }
+        .setups-col-title { font-family: var(--font-mono); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 2px solid var(--border-color); }
+        .setups-col-title.bull { color: var(--bull); border-bottom-color: var(--bull); }
+        .setups-col-title.bear { color: var(--bear); border-bottom-color: var(--bear); }
+
+        .setup-card { background-color: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
+        .setup-top-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .setup-ticker { font-family: var(--font-mono); font-weight: 700; font-size: 1.05em; text-decoration: none; }
+        .setup-ticker.bull { color: var(--bull); }
+        .setup-ticker.bear { color: var(--bear); }
+        .setup-price { font-family: var(--font-mono); color: var(--text-dim); font-size: 0.9em; }
+        .setup-industry { font-family: var(--font-mono); font-size: 0.75em; color: var(--text-dim); margin: 1px 0 8px 0; text-transform: uppercase; letter-spacing: 0.03em; }
+        .setup-score { font-family: var(--font-mono); font-weight: 600; font-size: 0.95em; }
+        .score-bar-track { height: 5px; border-radius: 3px; background: var(--border-color); margin: 6px 0 8px 0; overflow: hidden; }
+        .score-bar-fill { height: 100%; border-radius: 3px; }
+        .score-bar-fill.bull { background-color: var(--bull); }
+        .score-bar-fill.bear { background-color: var(--bear); }
+        .setup-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+        .chip { font-family: var(--font-mono); font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: var(--th-bg); color: var(--text-dim); border: 1px solid var(--border-color); white-space: nowrap; }
+        .setups-empty { color: var(--text-dim); font-size: 0.9em; font-style: italic; }
+
+        /* Mobile Fixes */
+        @media (max-width: 37.5em) {
+            body { margin: 10px; }
+            table { width: 100% !important; }
+            html { -webkit-text-size-adjust: none; text-size-adjust: none; }
+            .fg-chart { display: none !important; }
+            th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
+            td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
+            .market-banner { font-size: 0.68em; padding: 3px 7px; }
+            .section-card { padding: 12px 14px; }
+        }
+
+        @media (min-width: 64em) {
+            .row { flex-direction: row; }
+            .column { margin: 0 10px; }
+            .summary-table { width: 60%; }
+            .setups-columns { flex-direction: row; }
+        }
+    </style>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Dark Mode Logic: defaults to the OS/browser color-scheme preference
+        // (handled by CSS media query) until the person clicks the toggle,
+        // at which point that explicit choice is saved and takes over.
+        const toggle = document.getElementById('theme-toggle');
+        const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        let savedTheme = localStorage.getItem('theme'); // 'dark' | 'light' | null (= follow system)
+
+        function effectiveTheme() {
+            return savedTheme || (systemDarkQuery.matches ? 'dark' : 'light');
+        }
+        function syncIcon() {
+            toggle.textContent = effectiveTheme() === 'dark' ? '☀️' : '🌙';
+        }
+
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+        syncIcon();
+
+        toggle.addEventListener('click', () => {
+            savedTheme = effectiveTheme() === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            localStorage.setItem('theme', savedTheme);
+            syncIcon();
+        });
+
+        // If the person hasn't made a manual choice, keep following the OS
+        // setting live (e.g. it flips at sunset) without needing a reload.
+        systemDarkQuery.addEventListener('change', () => {
+            if (!savedTheme) syncIcon();
+        });
+
+        // Sorting Logic
+        document.querySelectorAll("table.sortable").forEach(table => {
+            const headers = table.querySelectorAll("th");
+            headers.forEach((header, i) => {
+                header.addEventListener("click", () => {
+                    const tbody = table.tBodies[0];
+                    const rows = Array.from(tbody.querySelectorAll("tr"));
+                    const wasAsc = header.classList.contains("asc");
+                    
+                    // Reset other headers
+                    headers.forEach(h => h.classList.remove("asc", "desc"));
+                    
+                    // Toggle state
+                    if (wasAsc) {
+                        header.classList.add("desc");
+                    } else {
+                        header.classList.add("asc");
+                    }
+                    const asc = !wasAsc;
+
+                    rows.sort((a, b) => {
+                        const aT = a.cells[i].innerText.trim(), bT = b.cells[i].innerText.trim();
+                        const aN = parseFloat(aT.replace(/[^0-9.-]/g, "")), bN = parseFloat(bT.replace(/[^0-9.-]/g, ""));
+                        return !isNaN(aN) && !isNaN(bN) ? (asc ? aN - bN : bN - aN) : (asc ? aT.localeCompare(bT) : bT.localeCompare(aT));
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        });
+
+        const rrgToggle = document.getElementById("rrg-toggle");
+        if (rrgToggle) {
+            rrgToggle.addEventListener("click", () => {
+                const panel = document.getElementById("rrg-panel");
+                const isOpen = panel.classList.toggle("open");
+                rrgToggle.textContent = isOpen ? "Hide full rotation chart ▲" : "Show full rotation chart ▼";
+            });
+        }
+    });
+    </script>
+    </head><body>
+    <div id="theme-toggle" class="theme-toggle">🌙</div>
+    <div class="page-header"><div class="nav-bar"><a href="index.html" class="nav-link">Home</a><a href="demark.html" class="nav-link">DeMark</a><a href="wyckoff.html" class="nav-link">Wyckoff</a><a href="rotation.html" class="nav-link active-link">Rotation</a></div><div class="topbar"><span class="market-banner">Market open 11:00pm–5:30am ACST</span></div></div>
+    <h1>Sector Rotation</h1><div class="date-subtitle">Signals triggered on Thursday, Aug 27, 2026 (as of NY close) · 27/27 tickers scanned · benchmark: SPY</div>
+
+    <div class="section-card">
+    <div class="theme-group macro"><div class="theme-heading"><span>Macro Context</span><span class="theme-count">4</span></div><div class="tile-row"><div class="tile" style="background:rgba(139,149,161,0.102);"><div class="tile-ticker">IWM</div><div class="tile-phase" style="color:var(--bear)">Weakening</div></div><div class="tile" style="background:rgba(139,149,161,0.078);"><div class="tile-ticker">QQQ</div><div class="tile-phase" style="color:var(--bull)">Leading</div></div><div class="tile" style="background:rgba(139,149,161,0.21);"><div class="tile-ticker">TLT</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div><div class="tile" style="background:rgba(139,149,161,0.178);"><div class="tile-ticker">UUP</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div></div></div><div class="theme-group"><div class="theme-heading"><span>Growth & Innovation</span><span class="theme-count">5</span></div><div class="tile-row"><div class="tile" style="background:rgba(102,179,255,0.108);"><div class="tile-ticker">SMH</div><div class="tile-phase" style="color:var(--bear)">Weakening</div><div class="tile-chips"><span class="mini-chip mini-bear">M DM13 · 3mo ago</span></div></div><div class="tile" style="background:rgba(102,179,255,0.2);"><div class="tile-ticker">XBI</div><div class="tile-phase" style="color:var(--bull)">Leading</div><div class="tile-chips"><span class="mini-chip mini-bear">M DM13 · 2mo ago</span></div></div><div class="tile" style="background:rgba(102,179,255,0.176);"><div class="tile-ticker">XLC</div><div class="tile-phase" style="color:var(--amber)">Improving</div></div><div class="tile" style="background:rgba(102,179,255,0.144);"><div class="tile-ticker">XLK</div><div class="tile-phase" style="color:var(--bear)">Weakening</div></div><div class="tile" style="background:rgba(102,179,255,0.179);"><div class="tile-ticker">XLY</div><div class="tile-phase" style="color:var(--amber)">Improving</div></div></div></div><div class="theme-group"><div class="theme-heading"><span>Financials & Housing</span><span class="theme-count">4</span></div><div class="tile-row"><div class="tile" style="background:rgba(245,166,35,0.036);"><div class="tile-ticker">KRE</div><div class="tile-phase" style="color:var(--bear)">Lagging</div><div class="tile-chips"><span class="mini-chip mini-bear">W DM9 · 5w ago</span><span class="mini-chip mini-bear">M DM9 · today</span></div></div><div class="tile" style="background:rgba(245,166,35,0.169);"><div class="tile-ticker">XHB</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div><div class="tile" style="background:rgba(245,166,35,0.056);"><div class="tile-ticker">XLF</div><div class="tile-phase" style="color:var(--amber)">Improving</div><div class="tile-chips"><span class="mini-chip mini-bear">W DM13 · 1w ago</span></div></div><div class="tile" style="background:rgba(245,166,35,0.181);"><div class="tile-ticker">XLRE</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div></div></div><div class="theme-group"><div class="theme-heading"><span>Defensive & Industrial</span><span class="theme-count">5</span></div><div class="tile-row"><div class="tile" style="background:rgba(61,220,132,0.038);"><div class="tile-ticker">XLB</div><div class="tile-phase" style="color:var(--amber)">Improving</div></div><div class="tile" style="background:rgba(61,220,132,0.086);"><div class="tile-ticker">XLI</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div><div class="tile" style="background:rgba(61,220,132,0.138);"><div class="tile-ticker">XLP</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div><div class="tile" style="background:rgba(61,220,132,0.218);"><div class="tile-ticker">XLU</div><div class="tile-phase" style="color:var(--bear)">Lagging</div></div><div class="tile" style="background:rgba(61,220,132,0.091);"><div class="tile-ticker">XLV</div><div class="tile-phase" style="color:var(--bull)">Leading</div></div></div></div><div class="theme-group"><div class="theme-heading"><span>Precious Metals</span><span class="theme-count">4</span></div><div class="tile-row"><div class="tile" style="background:rgba(201,139,255,0.083);"><div class="tile-ticker">GDX</div><div class="tile-phase" style="color:var(--bull)">Leading</div><div class="tile-chips"><span class="mini-chip mini-bull">W DM9 · 5w ago</span></div></div><div class="tile" style="background:rgba(201,139,255,0.08);"><div class="tile-ticker">PHYS</div><div class="tile-phase" style="color:var(--amber)">Improving</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · 10d ago</span><span class="mini-chip mini-bull">W DM13 · 6w ago</span></div></div><div class="tile" style="background:rgba(201,139,255,0.055);"><div class="tile-ticker">PSLV</div><div class="tile-phase" style="color:var(--amber)">Improving</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · 10d ago</span></div></div><div class="tile" style="background:rgba(201,139,255,0.056);"><div class="tile-ticker">SILJ</div><div class="tile-phase" style="color:var(--bull)">Leading</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · 10d ago</span></div></div></div></div><div class="theme-group"><div class="theme-heading"><span>Energy, Materials & Crypto</span><span class="theme-count">5</span></div><div class="tile-row"><div class="tile" style="background:rgba(255,140,102,0.139);"><div class="tile-ticker">COPX</div><div class="tile-phase" style="color:var(--bull)">Leading</div></div><div class="tile" style="background:rgba(255,140,102,0.09);"><div class="tile-ticker">ETHA</div><div class="tile-phase" style="color:var(--amber)">Improving</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · 1d ago</span><span class="mini-chip mini-bear">W DM9 · 1w ago</span><span class="mini-chip mini-bull">M DM9 · 2mo ago</span></div></div><div class="tile" style="background:rgba(255,140,102,0.103);"><div class="tile-ticker">IBIT</div><div class="tile-phase" style="color:var(--amber)">Improving</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · today</span><span class="mini-chip mini-bull">M DM9 · 2mo ago</span></div></div><div class="tile" style="background:rgba(255,140,102,0.118);"><div class="tile-ticker">UUUU</div><div class="tile-phase" style="color:var(--amber)">Improving</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · 10d ago</span></div></div><div class="tile" style="background:rgba(255,140,102,0.114);"><div class="tile-ticker">XLE</div><div class="tile-phase" style="color:var(--bull)">Leading</div><div class="tile-chips"><span class="mini-chip mini-bear">D DM9 · 5d ago</span></div></div></div></div>
+    <div id="rrg-toggle" class="rrg-toggle">Show full rotation chart ▼</div>
+    <div id="rrg-panel" class="rrg-panel"><svg viewBox="0 0 460 460" style="width:100%; height:auto;"><rect x="243.8" y="0" width="216.2" height="212.7" fill="#12301f" opacity="0.55"/><rect x="0" y="0" width="243.8" height="212.7" fill="#1a2333" opacity="0.55"/><rect x="0" y="212.7" width="243.8" height="247.3" fill="#301818" opacity="0.55"/><rect x="243.8" y="212.7" width="216.2" height="247.3" fill="#2e2712" opacity="0.55"/><line x1="243.8" y1="0" x2="243.8" y2="460" stroke="#3a4048" stroke-width="1"/><line x1="0" y1="212.7" x2="460" y2="212.7" stroke="#3a4048" stroke-width="1"/><text x="450" y="14" text-anchor="end" class="quad-label" fill="#3ddc84">Leading</text><text x="10" y="14" text-anchor="start" class="quad-label" fill="#66b3ff">Improving</text><text x="10" y="454" text-anchor="start" class="quad-label" fill="#ff5c5c">Lagging</text><text x="450" y="454" text-anchor="end" class="quad-label" fill="#f5a623">Weakening</text><polyline points="359.7,294.0 345.2,288.1 340.8,254.1 342.3,237.0 336.1,234.9 313.0,243.3" fill="none" stroke="#8b95a1" stroke-width="1.4" opacity="0.55"/><circle cx="313.0" cy="243.3" r="5" fill="#8b95a1"/><text x="320.0" y="237.3" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">IWM</text><polyline points="284.8,326.5 282.5,296.9 296.6,258.7 305.3,228.3 302.9,200.1 289.7,207.6" fill="none" stroke="#8b95a1" stroke-width="1.4" opacity="0.55"/><circle cx="289.7" cy="207.6" r="5" fill="#8b95a1"/><text x="296.7" y="201.6" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">QQQ</text><polyline points="77.8,239.3 80.3,239.2 67.0,244.9 55.2,242.1 57.9,240.6 71.2,225.5" fill="none" stroke="#8b95a1" stroke-width="1.4" opacity="0.55"/><circle cx="71.2" cy="225.5" r="5" fill="#8b95a1"/><text x="78.2" y="219.5" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">TLT</text><polyline points="147.4,202.0 123.9,234.6 92.2,266.0 81.1,298.6 89.3,292.3 102.0,242.6" fill="none" stroke="#8b95a1" stroke-width="1.4" opacity="0.55"/><circle cx="102.0" cy="242.6" r="5" fill="#8b95a1"/><text x="109.0" y="236.6" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">UUP</text><polyline points="345.4,346.2 342.7,308.1 338.5,274.2 337.0,257.0 331.2,231.9 319.1,244.7" fill="none" stroke="#66b3ff" stroke-width="1.4" opacity="0.55"/><circle cx="319.1" cy="244.7" r="5" fill="#66b3ff"/><text x="326.1" y="238.7" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">SMH</text><polyline points="364.7,253.7 355.9,286.2 352.0,272.9 379.4,221.9 398.5,178.2 406.9,160.7" fill="none" stroke="#66b3ff" stroke-width="1.4" opacity="0.55"/><circle cx="406.9" cy="160.7" r="5" fill="#66b3ff"/><text x="413.9" y="154.7" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XBI</text><polyline points="57.2,170.3 55.7,189.8 71.6,197.3 82.8,191.5 92.7,187.2 103.4,178.4" fill="none" stroke="#66b3ff" stroke-width="1.4" opacity="0.55"/><circle cx="103.4" cy="178.4" r="5" fill="#66b3ff"/><text x="110.4" y="172.4" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLC</text><polyline points="347.5,293.3 355.7,261.7 362.9,231.9 366.0,218.3 363.5,200.3 353.0,214.7" fill="none" stroke="#66b3ff" stroke-width="1.4" opacity="0.55"/><circle cx="353.0" cy="214.7" r="5" fill="#66b3ff"/><text x="360.0" y="208.7" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLK</text><polyline points="67.2,211.9 76.6,207.1 98.1,189.3 101.2,165.2 93.8,185.3 100.6,187.8" fill="none" stroke="#66b3ff" stroke-width="1.4" opacity="0.55"/><circle cx="100.6" cy="187.8" r="5" fill="#66b3ff"/><text x="107.6" y="181.8" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLY</text><polyline points="369.0,180.6 330.5,220.5 312.0,232.7 280.3,260.4 264.6,278.6 237.6,271.6" fill="none" stroke="#f5a623" stroke-width="1.4" opacity="0.55"/><circle cx="237.6" cy="271.6" r="5" fill="#f5a623"/><text x="244.6" y="265.6" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">KRE</text><polyline points="142.4,254.0 140.9,247.5 130.0,233.6 134.4,225.0 118.9,230.3 110.3,235.8" fill="none" stroke="#f5a623" stroke-width="1.4" opacity="0.55"/><circle cx="110.3" cy="235.8" r="5" fill="#f5a623"/><text x="117.3" y="229.8" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XHB</text><polyline points="224.7,136.8 218.3,162.4 210.9,190.2 204.4,212.8 211.5,228.1 219.1,211.7" fill="none" stroke="#f5a623" stroke-width="1.4" opacity="0.55"/><circle cx="219.1" cy="211.7" r="5" fill="#f5a623"/><text x="226.1" y="205.7" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLF</text><polyline points="218.3,110.7 177.3,205.1 121.6,298.9 103.8,384.7 103.8,406.9 98.8,340.5" fill="none" stroke="#f5a623" stroke-width="1.4" opacity="0.55"/><circle cx="98.8" cy="340.5" r="5" fill="#f5a623"/><text x="105.8" y="334.5" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLRE</text><polyline points="205.9,244.9 209.9,227.7 197.5,220.3 217.2,199.6 223.5,195.7 235.7,187.8" fill="none" stroke="#3ddc84" stroke-width="1.4" opacity="0.55"/><circle cx="235.7" cy="187.8" r="5" fill="#3ddc84"/><text x="242.7" y="181.8" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLB</text><polyline points="293.9,233.2 287.3,233.6 264.3,233.0 246.6,245.7 222.0,262.2 190.4,279.3" fill="none" stroke="#3ddc84" stroke-width="1.4" opacity="0.55"/><circle cx="190.4" cy="279.3" r="5" fill="#3ddc84"/><text x="197.4" y="273.3" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLI</text><polyline points="165.3,188.6 145.8,224.1 134.2,235.6 129.9,245.8 135.1,261.1 139.8,222.3" fill="none" stroke="#3ddc84" stroke-width="1.4" opacity="0.55"/><circle cx="139.8" cy="222.3" r="5" fill="#3ddc84"/><text x="146.8" y="216.3" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLP</text><polyline points="139.9,213.8 107.2,238.5 69.0,250.6 53.1,270.4 62.4,262.3 63.0,241.1" fill="none" stroke="#3ddc84" stroke-width="1.4" opacity="0.55"/><circle cx="63.0" cy="241.1" r="5" fill="#3ddc84"/><text x="70.0" y="235.1" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLU</text><polyline points="254.1,174.9 245.6,218.3 231.4,222.5 260.9,194.9 283.9,184.8 302.4,159.7" fill="none" stroke="#3ddc84" stroke-width="1.4" opacity="0.55"/><circle cx="302.4" cy="159.7" r="5" fill="#3ddc84"/><text x="309.4" y="153.7" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLV</text><polyline points="143.0,278.9 171.0,217.4 190.1,168.6 245.3,87.4 273.8,53.1 295.2,67.8" fill="none" stroke="#c98bff" stroke-width="1.4" opacity="0.55"/><circle cx="295.2" cy="67.8" r="5" fill="#c98bff"/><text x="302.2" y="61.8" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">GDX</text><polyline points="136.2,236.8 145.2,213.8 151.7,196.4 176.6,163.3 190.9,145.5 195.6,151.5" fill="none" stroke="#c98bff" stroke-width="1.4" opacity="0.55"/><circle cx="195.6" cy="151.5" r="5" fill="#c98bff"/><text x="202.6" y="145.5" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">PHYS</text><polyline points="177.2,240.6 185.9,219.1 190.9,206.6 208.1,184.4 217.5,172.6 220.2,178.5" fill="none" stroke="#c98bff" stroke-width="1.4" opacity="0.55"/><circle cx="220.2" cy="178.5" r="5" fill="#c98bff"/><text x="227.2" y="172.5" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">PSLV</text><polyline points="170.6,281.4 188.4,238.8 204.2,197.4 239.9,137.1 259.7,100.2 269.2,110.9" fill="none" stroke="#c98bff" stroke-width="1.4" opacity="0.55"/><circle cx="269.2" cy="110.9" r="5" fill="#c98bff"/><text x="276.2" y="104.9" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">SILJ</text><polyline points="241.9,241.5 265.6,197.5 272.3,179.8 304.5,150.3 324.8,133.9 348.2,132.7" fill="none" stroke="#ff8c66" stroke-width="1.4" opacity="0.55"/><circle cx="348.2" cy="132.7" r="5" fill="#ff8c66"/><text x="355.2" y="126.7" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">COPX</text><polyline points="143.3,180.9 149.3,177.8 152.9,177.9 154.4,186.9 169.2,175.5 186.2,157.4" fill="none" stroke="#ff8c66" stroke-width="1.4" opacity="0.55"/><circle cx="186.2" cy="157.4" r="5" fill="#ff8c66"/><text x="193.2" y="151.4" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">ETHA</text><polyline points="133.0,189.8 136.1,190.0 137.5,194.0 135.7,203.3 153.2,193.7 173.9,177.5" fill="none" stroke="#ff8c66" stroke-width="1.4" opacity="0.55"/><circle cx="173.9" cy="177.5" r="5" fill="#ff8c66"/><text x="180.9" y="171.5" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">IBIT</text><polyline points="97.9,299.2 111.7,268.1 131.7,214.1 153.6,167.6 163.2,142.0 159.3,162.0" fill="none" stroke="#ff8c66" stroke-width="1.4" opacity="0.55"/><circle cx="159.3" cy="162.0" r="5" fill="#ff8c66"/><text x="166.3" y="156.0" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">UUUU</text><polyline points="308.9,157.1 294.7,170.4 289.1,184.8 299.4,202.3 320.7,203.5 324.1,189.8" fill="none" stroke="#ff8c66" stroke-width="1.4" opacity="0.55"/><circle cx="324.1" cy="189.8" r="5" fill="#ff8c66"/><text x="331.1" y="183.8" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">XLE</text></svg></div>
+    </div>
+    <div class="update-footer">Last updated: 2026-08-29 13:13 UTC</div></body></html>
