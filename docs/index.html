@@ -85,7 +85,12 @@
            line underneath on narrow screens — .page-header/.topbar are plain
            in-flow flex, no absolute positioning, so nothing here ever overlaps
            the nav links. */
-        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
+        /* padding-right reserves space for the fixed top-right .theme-toggle
+           so the market-banner (right-aligned via space-between) doesn't
+           render underneath it on wide/desktop viewports where nav+banner
+           fit on one line. On narrow viewports the banner already wraps to
+           its own line below nav, so this has no visible effect there. */
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; padding-right: 44px; }
         .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
         /* Dark-mode toggle is deliberately taken out of the .page-header flex
@@ -269,16 +274,6 @@
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
-                <a href="https://www.tradingview.com/chart/?symbol=SITC" target="_blank" class="setup-ticker bull">SITC</a>
-                <span class="setup-price">$2.98</span>
-                <span class="setup-score bull" style="color:var(--bull);">7.80</span>
-            </div>
-            <div class="setup-industry">REIT - Retail</div>
-            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
-            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM13 Bottom · 4w ago</span></div>
-        </div>
-        <div class="setup-card">
-            <div class="setup-top-row">
                 <a href="https://www.tradingview.com/chart/?symbol=EH" target="_blank" class="setup-ticker bull">EH</a>
                 <span class="setup-price">$4.66</span>
                 <span class="setup-score bull" style="color:var(--bull);">7.80</span>
@@ -286,6 +281,16 @@
             <div class="setup-industry">Aerospace & Defense</div>
             <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
             <div class="setup-chips"><span class="chip">Monthly DM9 Bottom · 2mo ago</span><span class="chip">Weekly DM9 Bottom · 5w ago</span><span class="chip">Daily DM9 Bottom · today</span></div>
+        </div>
+        <div class="setup-card">
+            <div class="setup-top-row">
+                <a href="https://www.tradingview.com/chart/?symbol=SITC" target="_blank" class="setup-ticker bull">SITC</a>
+                <span class="setup-price">$2.98</span>
+                <span class="setup-score bull" style="color:var(--bull);">7.80</span>
+            </div>
+            <div class="setup-industry">REIT - Retail</div>
+            <div class="score-bar-track"><div class="score-bar-fill bull" style="width:45%;"></div></div>
+            <div class="setup-chips"><span class="chip">Monthly DM13 Bottom · today</span><span class="chip">Weekly DM13 Bottom · 4w ago</span></div>
         </div>
         <div class="setup-card">
             <div class="setup-top-row">
@@ -414,4 +419,4 @@
         </div>
     </div>
     <p style="opacity:0.6; font-size:0.85em; margin-top:20px;">Score = weighted sum of confirming signals (weekly/daily DeMark + Wyckoff LPS) across timeframes, with a stacking bonus for multiple distinct signal types and a tradeability multiplier by price. See <a href="demark.html" class="nav-link" style="font-size:1em;">DeMark</a> and <a href="wyckoff.html" class="nav-link" style="font-size:1em;">Wyckoff</a> tabs for the full underlying scans.</p>
-    <div class="update-footer">Last updated: 2026-08-29 05:54 UTC</div></body></html>
+    <div class="update-footer">Last updated: 2026-08-29 11:48 UTC</div></body></html>
