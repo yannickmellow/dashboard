@@ -56,11 +56,7 @@ def fetch_tickers_and_sectors_from_csv(cache_file):
 def load_or_fetch_price_data(tickers, interval, period, cache_key):
     cache_key = cache_key.upper()
     cache_file = os.path.join("cache", f"price_cache_{cache_key}.pkl")
-    weekday = datetime.utcnow().weekday()
-    # If weekend, use cache
-    if weekday >= 5 and os.path.exists(cache_file):
-        with open(cache_file, "rb") as f: return pickle.load(f)
-        
+
     all_data = {}
     for i in range(0, len(tickers), 50):
         batch = tickers[i:i + 50]
@@ -73,10 +69,17 @@ def load_or_fetch_price_data(tickers, interval, period, cache_key):
                         all_data[ticker] = batch_data.xs(ticker, level=0)
             time.sleep(0.1)
         except: pass
-        
-    if not all_data:
-        # Live fetch returned nothing (network issue, rate limit, etc.) — don't
-        # clobber a good cache with an empty one; fall back to whatever's cached.
+
+    # Require a reasonable fraction of the universe to have actually come
+    # back before trusting this fetch enough to overwrite the cache. A
+    # totally empty result was already guarded against; this also catches a
+    # PARTIALLY failed fetch (e.g. many batches erroring out) that would
+    # otherwise silently commit an incomplete snapshot as if it were a
+    # complete, fresh update.
+    if len(all_data) < 0.5 * len(tickers):
+        # Live fetch returned too little (network issue, rate limit, partial
+        # outage, etc.) — don't clobber a good cache with an incomplete one;
+        # fall back to whatever's cached.
         if os.path.exists(cache_file):
             with open(cache_file, "rb") as f: return pickle.load(f)
         return all_data
