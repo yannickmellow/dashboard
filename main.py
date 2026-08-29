@@ -98,8 +98,20 @@ def _drop_incomplete_bar(df):
     monthly price data must apply this -- previously only scan_timeframe()
     did, while build_confluence_scores() (which powers the Home page's Top
     Setups) read the raw cache directly and could report a signal as
-    'today' that hadn't actually confirmed yet."""
-    return df.iloc[:-1] if len(df) > 1 else df
+    'today' that hadn't actually confirmed yet.
+
+    Weekend exception: markets are closed on Sat/Sun, so nothing can
+    genuinely be "still forming" then -- the most recent bar is necessarily
+    already closed (e.g. a delayed/manual run landing on a Saturday, after
+    GitHub Actions pushed a scheduled Friday run back past midnight). The
+    plain 'always drop the last row' version wrongly discarded a
+    already-closed week/month in exactly that case. This only changes
+    weekend behavior; normal weekday runs are unaffected."""
+    if len(df) <= 1:
+        return df
+    if pd.Timestamp.now().weekday() >= 5:  # Sat=5, Sun=6
+        return df
+    return df.iloc[:-1]
 
 # ==========================================
 # 2. SIGNAL LOGIC
