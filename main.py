@@ -66,7 +66,21 @@ def load_or_fetch_price_data(tickers, interval, period, cache_key):
             if isinstance(batch_data, pd.DataFrame):
                 for ticker in batch:
                     if (ticker,) in batch_data.index:
-                        all_data[ticker] = batch_data.xs(ticker, level=0)
+                        ticker_df = batch_data.xs(ticker, level=0)
+                        # Yahoo sometimes returns the most recent row(s) with
+                        # real open/high/low/volume but a NULL close (not yet
+                        # backfilled) -- observed affecting ~99% of the
+                        # universe on a delayed weekend fetch, ~9 hours after
+                        # the actual close. A null close silently zeroes the
+                        # TD Sequential streak at exactly the most recent
+                        # bar (NaN comparisons are always False), producing
+                        # correct-looking-but-wrong "0 signals" output
+                        # instead of a visible error. Drop any such trailing
+                        # rows so every downstream reader only ever sees
+                        # bars with a real, usable close.
+                        while len(ticker_df) > 0 and pd.isna(ticker_df['close'].iloc[-1]):
+                            ticker_df = ticker_df.iloc[:-1]
+                        all_data[ticker] = ticker_df
             time.sleep(0.1)
         except: pass
 
