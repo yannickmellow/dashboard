@@ -308,8 +308,8 @@ def scan_timeframe(ticker_map, industry_map, label, interval):
         except: pass
         
     # Sort Descending (Z-A) by Default as requested
-    results["Tops"].sort(key=lambda x: x[0], reverse=True)
-    results["Bottoms"].sort(key=lambda x: x[0], reverse=True)
+    results["Tops"].sort(key=lambda x: x[0])
+    results["Bottoms"].sort(key=lambda x: x[0])
         
     return results, sector_counts, candle_date if candle_date else "N/A"
 
@@ -329,7 +329,7 @@ def scan_wyckoff(ticker_map, industry_map):
                             pct, days_since, sos_close, dist_pct))
         except: pass
     # Sort Descending (Z-A) by default
-    return sorted(res, key=lambda x: x[0], reverse=True)
+    return sorted(res, key=lambda x: x[0])
 
 # ==========================================
 # 3b. CONFLUENCE SCORING
@@ -707,7 +707,12 @@ def get_shared_style(fg_color):
            line underneath on narrow screens — .page-header/.topbar are plain
            in-flow flex, no absolute positioning, so nothing here ever overlaps
            the nav links. */
-        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; }
+        /* padding-right reserves space for the fixed top-right .theme-toggle
+           so the market-banner (right-aligned via space-between) doesn't
+           render underneath it on wide/desktop viewports where nav+banner
+           fit on one line. On narrow viewports the banner already wraps to
+           its own line below nav, so this has no visible effect there. */
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 20px; padding-right: 44px; }
         .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .market-banner { font-family: var(--font-mono); font-size: 0.78em; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: 12px; padding: 4px 10px; white-space: nowrap; }
         /* Dark-mode toggle is deliberately taken out of the .page-header flex
