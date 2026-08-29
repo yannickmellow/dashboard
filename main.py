@@ -575,6 +575,268 @@ def backfill_signal_returns():
             writer.writerows(rows)
 
 # ==========================================
+# 3c. SECTOR ROTATION
+# ==========================================
+
+# Fixed display order: group name -> ticker list. Every group sorts its
+# tickers alphabetically -- no manual/special-cased ordering for any group.
+# SPY is the RRG benchmark (the denominator in the relative-strength math)
+# so it never gets a rotation tile of its own, but it still gets scanned
+# for DM9/13 like everything else here.
+SECTOR_ROTATION_BENCHMARK = "SPY"
+SECTOR_ROTATION_GROUPS = {
+    "Macro Context": sorted(["QQQ", "IWM", "TLT", "UUP"]),
+    "Growth & Innovation": sorted(["XLK", "XLC", "XLY", "XBI", "SMH"]),
+    "Financials & Housing": sorted(["XLF", "KRE", "XLRE", "XHB"]),
+    "Defensive & Industrial": sorted(["XLP", "XLV", "XLU", "XLI", "XLB"]),
+    "Precious Metals": sorted(["PHYS", "PSLV", "GDX", "SILJ"]),
+    "Energy, Materials & Crypto": sorted(["XLE", "COPX", "UUUU", "IBIT", "ETHA"]),
+}
+SECTOR_ROTATION_TICKERS = [t for grp in SECTOR_ROTATION_GROUPS.values() for t in grp]
+
+# RRG tuning knobs. These are a documented, defensible APPROXIMATION of the
+# JdK RS-Ratio/RS-Momentum method (StockCharts' exact formula/constants
+# aren't public) -- z-score-normalize relative strength against its own
+# trailing baseline, then take the rate of change of that normalized ratio
+# as momentum. Directionally correct (outperformance -> RS-Ratio > 100,
+# accelerating outperformance -> RS-Momentum > 100) even if the precise
+# scaling differs from StockCharts' own charts.
+RRG_SMOOTH_WINDOW = 3      # weeks, light smoothing of the raw RS ratio
+RRG_BASELINE_WINDOW = 52   # weeks (~1y), the "normal" level RS-Ratio z-scores against
+RRG_MOMENTUM_WINDOW = 4    # weeks, lookback for the RS-Ratio rate of change
+RRG_RATIO_SCALE = 10       # how many RS-Ratio points = 1 std dev of relative strength
+RRG_MOMENTUM_SCALE = 40    # how many RS-Momentum points = 1 std dev of RS-Ratio's own ROC
+RRG_TAIL_LENGTH = 6        # weeks of trailing (ratio, momentum) points to keep for the plot
+
+
+def compute_rrg_series(ticker_close, benchmark_close):
+    """
+    Given two aligned weekly close Series (same index), returns
+    (rs_ratio, rs_momentum) Series -- both centered at 100, matching the
+    standard RRG convention: RS-Ratio > 100 means outperforming the
+    benchmark relative to its own recent baseline; RS-Momentum > 100 means
+    that outperformance is currently accelerating (not just present).
+    """
+    rs = ticker_close / benchmark_close
+    rs_smoothed = rs.rolling(RRG_SMOOTH_WINDOW, min_periods=1).mean()
+    baseline_mean = rs_smoothed.rolling(RRG_BASELINE_WINDOW, min_periods=5).mean()
+    baseline_std = rs_smoothed.rolling(RRG_BASELINE_WINDOW, min_periods=5).std()
+    baseline_std = baseline_std.replace(0, pd.NA)
+    rs_ratio = 100 + (rs_smoothed - baseline_mean) / baseline_std * RRG_RATIO_SCALE
+
+    momentum_diff = rs_ratio.diff(RRG_MOMENTUM_WINDOW)
+    momentum_baseline_std = momentum_diff.rolling(RRG_BASELINE_WINDOW, min_periods=5).std()
+    momentum_baseline_std = momentum_baseline_std.replace(0, pd.NA)
+    rs_momentum = 100 + momentum_diff / momentum_baseline_std * RRG_MOMENTUM_SCALE
+
+    return rs_ratio, rs_momentum
+
+
+def classify_rrg_phase(rs_ratio, rs_momentum):
+    """Standard RRG quadrant, matching the site's Wyckoff-style bull/bear
+    coloring intent: Leading/Improving read constructive, Weakening/Lagging
+    read cautionary."""
+    if pd.isna(rs_ratio) or pd.isna(rs_momentum):
+        return None
+    if rs_ratio >= 100:
+        return "Leading" if rs_momentum >= 100 else "Weakening"
+    else:
+        return "Improving" if rs_momentum >= 100 else "Lagging"
+
+
+def scan_sector_rotation():
+    """
+    Fetches weekly data for the sector-rotation universe (small, fixed list
+    -- not the main ~2000-ticker stock universe, so it gets its own
+    dedicated fetch/cache rather than sharing price_cache_1W.pkl), computes
+    each ticker's current RRG phase + a short trailing tail, and scans the
+    same tickers for Daily/Weekly/Monthly DM9/13 signals via the existing,
+    already-verified scan machinery.
+
+    Returns a dict: {ticker: {"group":, "rs_ratio":, "rs_momentum":,
+    "phase":, "tail": [(ratio, momentum), ...], "daily": recency_dict,
+    "weekly": recency_dict, "monthly": recency_dict}}
+    """
+    all_tickers = list(dict.fromkeys(SECTOR_ROTATION_TICKERS + [SECTOR_ROTATION_BENCHMARK]))
+    ticker_to_group = {t: g for g, ts in SECTOR_ROTATION_GROUPS.items() for t in ts}
+
+    weekly_data = load_or_fetch_price_data(all_tickers, "1wk", "3y", "ROTATION_1W")
+    daily_data = load_or_fetch_price_data(all_tickers, "1d", "3mo", "ROTATION_1D")
+    monthly_data = load_or_fetch_price_data(all_tickers, "1mo", "2y", "ROTATION_1M")
+
+    results = {}
+    if SECTOR_ROTATION_BENCHMARK not in weekly_data:
+        return results  # can't compute anything without the benchmark
+    bench_df = weekly_data[SECTOR_ROTATION_BENCHMARK].reset_index()
+    bench_df.columns = [c.lower() for c in bench_df.columns]
+    bench_df = _drop_incomplete_bar(bench_df)
+    bench_close = bench_df.set_index("date")["close"]
+
+    for t in SECTOR_ROTATION_TICKERS:
+        if t not in weekly_data:
+            continue
+        try:
+            wdf = weekly_data[t].reset_index()
+            wdf.columns = [c.lower() for c in wdf.columns]
+            wdf = _drop_incomplete_bar(wdf)
+            tdf = wdf.set_index("date")["close"]
+
+            aligned = pd.concat([tdf, bench_close], axis=1, keys=["t", "b"]).dropna()
+            if len(aligned) < 10:
+                continue
+            rs_ratio, rs_momentum = compute_rrg_series(aligned["t"], aligned["b"])
+
+            phase = classify_rrg_phase(rs_ratio.iloc[-1], rs_momentum.iloc[-1])
+            tail_r = rs_ratio.tail(RRG_TAIL_LENGTH).tolist()
+            tail_m = rs_momentum.tail(RRG_TAIL_LENGTH).tolist()
+            tail = [(r, m) for r, m in zip(tail_r, tail_m) if pd.notna(r) and pd.notna(m)]
+            if phase is None or not tail:
+                continue
+
+            entry = {
+                "group": ticker_to_group.get(t, "Other"),
+                "rs_ratio": round(float(rs_ratio.iloc[-1]), 2),
+                "rs_momentum": round(float(rs_momentum.iloc[-1]), 2),
+                "phase": phase,
+                "tail": tail,
+                "daily": None, "weekly": None, "monthly": None,
+            }
+
+            if t in daily_data:
+                ddf = daily_data[t].reset_index(); ddf.columns = [c.lower() for c in ddf.columns]
+                if len(ddf) >= 20:
+                    entry["daily"] = compute_dm_recency(ddf, CONF_DAILY_LOOKBACK)
+            if len(wdf) >= 20:
+                entry["weekly"] = compute_dm_recency(wdf, CONF_WEEKLY_LOOKBACK)
+            if t in monthly_data:
+                mdf = monthly_data[t].reset_index(); mdf.columns = [c.lower() for c in mdf.columns]
+                mdf = _drop_incomplete_bar(mdf)
+                if len(mdf) >= 20:
+                    entry["monthly"] = compute_dm_recency(mdf, CONF_MONTHLY_LOOKBACK)
+
+            results[t] = entry
+        except Exception:
+            continue
+
+    return results
+
+# Colors are for tile/dot backgrounds ONLY (constant per group, encodes the
+# static theme) -- kept deliberately distinct from the phase colors
+# (var(--bull)/var(--amber)/var(--bear), which encode the live
+# Leading/Improving/Weakening/Lagging state) so the two concepts never
+# visually collide.
+ROTATION_GROUP_COLORS = {
+    "Macro Context": "139,149,161",
+    "Growth & Innovation": "102,179,255",
+    "Financials & Housing": "245,166,35",
+    "Defensive & Industrial": "61,220,132",
+    "Precious Metals": "201,139,255",
+    "Energy, Materials & Crypto": "255,140,102",
+}
+ROTATION_PHASE_COLOR_VARS = {"Leading": "var(--bull)", "Improving": "var(--amber)", "Weakening": "var(--bear)", "Lagging": "var(--bear)"}
+_ROTATION_UNIT_SUFFIX = {"D": "d", "W": "w", "M": "mo"}
+
+
+def _rrg_recency_chips(recency, prefix):
+    """Compact chip(s) for one timeframe's recency dict, e.g. 'W DM9 · today'
+    -- at most one bull + one bear chip, preferring DM13 over DM9 per
+    direction (same priority as confluence scoring)."""
+    if not recency:
+        return ""
+    unit = _ROTATION_UNIT_SUFFIX[prefix]
+    def fmt(days): return "today" if days == 0 else f"{days}{unit} ago"
+    chips = ""
+    if recency.get("bot13") is not None:
+        chips += f'<span class="mini-chip mini-bull">{prefix} DM13 · {fmt(recency["bot13"])}</span>'
+    elif recency.get("bot9") is not None:
+        chips += f'<span class="mini-chip mini-bull">{prefix} DM9 · {fmt(recency["bot9"])}</span>'
+    if recency.get("top13") is not None:
+        chips += f'<span class="mini-chip mini-bear">{prefix} DM13 · {fmt(recency["top13"])}</span>'
+    elif recency.get("top9") is not None:
+        chips += f'<span class="mini-chip mini-bear">{prefix} DM9 · {fmt(recency["top9"])}</span>'
+    return chips
+
+
+def _tile_opacity(rs_ratio):
+    """Map RS-Ratio to a tile background opacity: further from 100 (in
+    either direction) = more saturated fill. Clamped so outliers don't
+    wash out to solid; the phase badge (not the tile shade) carries the
+    directional Leading/Lagging meaning."""
+    strength = max(0, min(1, abs(rs_ratio - 100) / 30))
+    return round(0.03 + strength * 0.27, 3)
+
+
+def gen_rotation_tiles(rotation_data):
+    h = ""
+    for group_name, tickers in SECTOR_ROTATION_GROUPS.items():
+        color = ROTATION_GROUP_COLORS.get(group_name, "139,149,161")
+        cls = "theme-group macro" if group_name == "Macro Context" else "theme-group"
+        h += f'<div class="{cls}"><div class="theme-heading"><span>{group_name}</span><span class="theme-count">{len(tickers)}</span></div><div class="tile-row">'
+        for t in tickers:
+            entry = rotation_data.get(t)
+            if not entry:
+                h += '<div></div>'
+                continue
+            opacity = _tile_opacity(entry["rs_ratio"])
+            phase = entry["phase"]
+            phase_color = ROTATION_PHASE_COLOR_VARS[phase]
+            chips = (_rrg_recency_chips(entry.get("daily"), "D") +
+                     _rrg_recency_chips(entry.get("weekly"), "W") +
+                     _rrg_recency_chips(entry.get("monthly"), "M"))
+            chips_html = f'<div class="tile-chips">{chips}</div>' if chips else ""
+            h += (f'<div class="tile" style="background:rgba({color},{opacity});">'
+                  f'<div class="tile-ticker">{t}</div>'
+                  f'<div class="tile-phase" style="color:{phase_color}">{phase}</div>'
+                  f'{chips_html}</div>')
+        h += '</div></div>'
+    return h
+
+
+def gen_rrg_svg(rotation_data):
+    if not rotation_data:
+        return '<p style="color:var(--text-dim);">Not enough history yet.</p>'
+
+    all_r = [p[0] for e in rotation_data.values() for p in e["tail"]]
+    all_m = [p[1] for e in rotation_data.values() for p in e["tail"]]
+    r_min, r_max = min(all_r + [95]), max(all_r + [105])
+    m_min, m_max = min(all_m + [95]), max(all_m + [105])
+    pad_r = (r_max - r_min) * 0.15 or 5
+    pad_m = (m_max - m_min) * 0.15 or 5
+    r_min, r_max = r_min - pad_r, r_max + pad_r
+    m_min, m_max = m_min - pad_m, m_max + pad_m
+
+    W, H = 460, 460
+    def x(r): return (r - r_min) / (r_max - r_min) * W
+    def y(m): return H - (m - m_min) / (m_max - m_min) * H  # SVG y grows downward
+    cx, cy = x(100), y(100)
+
+    svg = f'<svg viewBox="0 0 {W} {H}" style="width:100%; height:auto;">'
+    svg += f'<rect x="{cx:.1f}" y="0" width="{W-cx:.1f}" height="{cy:.1f}" fill="#12301f" opacity="0.55"/>'
+    svg += f'<rect x="0" y="0" width="{cx:.1f}" height="{cy:.1f}" fill="#1a2333" opacity="0.55"/>'
+    svg += f'<rect x="0" y="{cy:.1f}" width="{cx:.1f}" height="{H-cy:.1f}" fill="#301818" opacity="0.55"/>'
+    svg += f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{W-cx:.1f}" height="{H-cy:.1f}" fill="#2e2712" opacity="0.55"/>'
+    svg += f'<line x1="{cx:.1f}" y1="0" x2="{cx:.1f}" y2="{H}" stroke="#3a4048" stroke-width="1"/>'
+    svg += f'<line x1="0" y1="{cy:.1f}" x2="{W}" y2="{cy:.1f}" stroke="#3a4048" stroke-width="1"/>'
+    svg += f'<text x="{W-10}" y="14" text-anchor="end" class="quad-label" fill="#3ddc84">Leading</text>'
+    svg += f'<text x="10" y="14" text-anchor="start" class="quad-label" fill="#66b3ff">Improving</text>'
+    svg += f'<text x="10" y="{H-6}" text-anchor="start" class="quad-label" fill="#ff5c5c">Lagging</text>'
+    svg += f'<text x="{W-10}" y="{H-6}" text-anchor="end" class="quad-label" fill="#f5a623">Weakening</text>'
+
+    for t, entry in rotation_data.items():
+        rgb = ROTATION_GROUP_COLORS.get(entry["group"], "139,149,161")
+        color = "#" + "".join(f"{int(c):02x}" for c in rgb.split(","))
+        tail = entry["tail"]
+        if len(tail) > 1:
+            pts = " ".join(f"{x(r):.1f},{y(m):.1f}" for r, m in tail)
+            svg += f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.4" opacity="0.55"/>'
+        lr, lm = tail[-1]
+        svg += f'<circle cx="{x(lr):.1f}" cy="{y(lm):.1f}" r="5" fill="{color}"/>'
+        svg += f'<text x="{x(lr)+7:.1f}" y="{y(lm)-6:.1f}" font-family="IBM Plex Mono" font-size="10.5" fill="#e6e9ec">{t}</text>'
+
+    svg += '</svg>'
+    return svg
+
+# ==========================================
 # 4. FEAR & GREED / PLOTS
 # ==========================================
 
@@ -729,6 +991,25 @@ def get_shared_style(fg_color):
            only the first h3 in the card should sit flush with no top margin. */
         .section-card h3 { font-family: var(--font-display); margin-top: 24px; margin-bottom: 8px; }
         .section-card h3:first-child { margin-top: 0; }
+
+        /* --- Sector Rotation page --- */
+        .theme-group { margin-bottom: 16px; }
+        .theme-group:last-child { margin-bottom: 0; }
+        .theme-group.macro { border-bottom: 1px dashed var(--border-color); padding-bottom: 14px; margin-bottom: 22px; }
+        .theme-heading { font-family: var(--font-mono); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .theme-count { opacity: 0.6; }
+        .tile-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+        .tile { border-radius: 6px; padding: 8px 9px; border: 1px solid var(--border-color); min-height: 54px; }
+        .tile-ticker { font-family: var(--font-mono); font-weight: 500; font-size: 0.95em; }
+        .tile-phase { font-family: var(--font-mono); font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; margin-top: 2px; }
+        .tile-chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+        .mini-chip { font-family: var(--font-mono); font-size: 0.62em; padding: 1px 5px; border-radius: 8px; }
+        .mini-bull { background: rgba(0,0,0,0.25); color: var(--bull); }
+        .mini-bear { background: rgba(0,0,0,0.25); color: var(--bear); }
+        .rrg-toggle { font-family: var(--font-mono); font-size: 0.8em; color: var(--link-color); cursor: pointer; user-select: none; margin: 4px 0 14px; display: inline-block; }
+        .rrg-panel { display: none; margin-bottom: 16px; }
+        .rrg-panel.open { display: block; }
+        .quad-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
         
         .nav-bar { margin-bottom: 0; }
         .nav-link { font-size: 1.1em; font-weight: bold; margin-right: 20px; text-decoration: none; color: var(--link-color); }
@@ -859,6 +1140,15 @@ def get_shared_style(fg_color):
                 });
             });
         });
+
+        const rrgToggle = document.getElementById("rrg-toggle");
+        if (rrgToggle) {
+            rrgToggle.addEventListener("click", () => {
+                const panel = document.getElementById("rrg-panel");
+                const isOpen = panel.classList.toggle("open");
+                rrgToggle.textContent = isOpen ? "Hide full rotation chart ▲" : "Show full rotation chart ▼";
+            });
+        }
     });
     </script>
     """
@@ -933,7 +1223,7 @@ def gen_setup_cards(setups, direction):
         </div>"""
     return cards
 
-def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_setups, date_str):
+def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_setups, date_str, rotation_data=None):
     f_val, f_prev, f_date = fg
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
@@ -958,6 +1248,7 @@ def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_
         f'<a href="index.html" class="nav-link{" active-link" if active=="home" else ""}">Home</a>'
         f'<a href="demark.html" class="nav-link{" active-link" if active=="demark" else ""}">DeMark</a>'
         f'<a href="wyckoff.html" class="nav-link{" active-link" if active=="wyckoff" else ""}">Wyckoff</a>'
+        f'<a href="rotation.html" class="nav-link{" active-link" if active=="rotation" else ""}">Rotation</a>'
         '</div>'
     )
 
@@ -1057,6 +1348,26 @@ def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_
     {updated_at}</body></html>"""
     with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
 
+    # --- ROTATION HTML ---
+    rotation_data = rotation_data or {}
+    n_scanned = len(rotation_data)
+    n_total = len(SECTOR_ROTATION_TICKERS)
+    tiles_html = gen_rotation_tiles(rotation_data)
+    rrg_html = gen_rrg_svg(rotation_data)
+
+    html_rot = f"""<html><head>{meta}<title>Rotation</title>{style}</head><body>
+    {theme_toggle}
+    <div class="page-header">{nav("rotation")}{toggle}</div>
+    <h1>Sector Rotation</h1><div class="date-subtitle">{date_str} · {n_scanned}/{n_total} tickers scanned · benchmark: {SECTOR_ROTATION_BENCHMARK}</div>
+
+    <div class="section-card">
+    {tiles_html if rotation_data else '<p style="color:var(--text-dim);">No rotation data yet -- this fills in after the next scan.</p>'}
+    <div id="rrg-toggle" class="rrg-toggle">Show full rotation chart ▼</div>
+    <div id="rrg-panel" class="rrg-panel">{rrg_html}</div>
+    </div>
+    {updated_at}</body></html>"""
+    with open("docs/rotation.html", "w", encoding="utf-8") as f: f.write(html_rot)
+
 def main():
     maps, inds = {}, {}
     for f in ["sp_cache.csv", "russell_cache.csv", "nasdaq_cache.csv", "NDQ_cache.csv", "AMEX_cache.csv", "NYSE_cache.csv"]:
@@ -1092,10 +1403,20 @@ def main():
     except Exception as e:
         print(f"WARNING: signal logging/backfill failed, continuing without it: {e}")
 
+    # Sector Rotation: separate, small (28-ticker) universe with its own
+    # dedicated fetch/cache, distinct from the main ~2000-stock scan above.
+    # Wrapped the same defensive way as everything else new -- a failure
+    # here must never be able to block the rest of the site from updating.
+    try:
+        rotation_data = scan_sector_rotation()
+    except Exception as e:
+        print(f"WARNING: sector rotation scan failed, continuing without it: {e}")
+        rotation_data = {}
+
     try:
         ds = f"Signals triggered on {datetime.strptime(d_date, '%Y-%m-%d').strftime('%A, %b %d, %Y')} (as of NY close)"
     except: ds = f"Signals triggered on {d_date} (as of NY close)"
     
-    write_reports(daily, weekly, monthly, d_s, w_s, m_s, fg, wyckoff, top_setups, ds)
+    write_reports(daily, weekly, monthly, d_s, w_s, m_s, fg, wyckoff, top_setups, ds, rotation_data)
 
 if __name__ == "__main__": main()
