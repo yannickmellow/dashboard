@@ -157,22 +157,46 @@ def compute_dm_signals(df):
 def compute_dm_recency(df, lookback):
     """
     Scans back `lookback` bars (not counting today) for the most recent
-    occurrence of each DM signal type. Returns a dict of days_since (0 =
-    today) for each of top9/top13/bot9/bot13, or None if not seen within
-    the lookback window.
+    NOT-YET-INVALIDATED occurrence of each DM signal type.
+
+    Invalidation: a bottom (bullish exhaustion) signal is invalidated the
+    moment any LATER close falls below the signal bar's own close -- price
+    has already broken through the level the signal was called at, so the
+    reversal thesis is dead even if the bar is still inside the lookback
+    window. A top (bearish exhaustion) signal is invalidated the same way
+    but in the opposite direction (a later close above the signal bar's
+    close). Close only (not high/low, which can wick through a level
+    without actually confirming the break) -- and no buffer/threshold: any
+    close beyond the reference immediately invalidates it, full stop.
+    Real DeMark methodology has an equivalent concept (TDST): the setup's
+    extreme becomes a risk level, and closing beyond it invalidates the
+    call -- this implementation's val_reset() doesn't actually do this
+    (confirmed elsewhere it's a no-op), so this is the first place that
+    concept exists in this codebase.
+
+    Returns a dict of days_since (0 = today) for each of
+    top9/top13/bot9/bot13, or None if not seen (or nothing survived
+    invalidation) within the lookback window.
     """
     TDUp, TDDn = _compute_dm_series(df)
     result = {"top9": None, "top13": None, "bot9": None, "bot13": None}
     if TDUp is None: return result
+    close = df["close"].values
     n = len(TDUp)
     today = n - 1
     earliest = max(0, today - lookback)
+
+    def invalidated(i, direction):
+        ref = close[i]
+        later = close[i + 1: today + 1]
+        return (later < ref).any() if direction == "bot" else (later > ref).any()
+
     for i in range(today, earliest - 1, -1):
         days_since = today - i
-        if result["top9"] is None and TDUp[i] == 9: result["top9"] = days_since
-        if result["top13"] is None and TDUp[i] == 13: result["top13"] = days_since
-        if result["bot9"] is None and TDDn[i] == 9: result["bot9"] = days_since
-        if result["bot13"] is None and TDDn[i] == 13: result["bot13"] = days_since
+        if result["top9"] is None and TDUp[i] == 9 and not invalidated(i, "top"): result["top9"] = days_since
+        if result["top13"] is None and TDUp[i] == 13 and not invalidated(i, "top"): result["top13"] = days_since
+        if result["bot9"] is None and TDDn[i] == 9 and not invalidated(i, "bot"): result["bot9"] = days_since
+        if result["bot13"] is None and TDDn[i] == 13 and not invalidated(i, "bot"): result["bot13"] = days_since
     return result
 
 # --- Wyckoff LPS tuning knobs ---
