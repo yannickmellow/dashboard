@@ -8,8 +8,6 @@ import requests
 import csv
 from collections import defaultdict
 import time
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import pytz
 
 # ==========================================
@@ -801,29 +799,38 @@ def _tile_background(rs_ratio):
     return f"rgba({color},{opacity})"
 
 
+def gen_tile_row(rotation_data, tickers):
+    """Renders just the <div class="tile-row">...</div> for a given list of
+    tickers -- shared by the full Rotation page (looping every group) and
+    the Home page's Macro Context strip (a single group)."""
+    h = '<div class="tile-row">'
+    for t in tickers:
+        entry = rotation_data.get(t)
+        if not entry:
+            h += '<div></div>'
+            continue
+        bg = _tile_background(entry["rs_ratio"])
+        phase = entry["phase"]
+        phase_color = ROTATION_PHASE_COLOR_VARS[phase]
+        chips = (_rrg_recency_chips(entry.get("daily"), "D") +
+                 _rrg_recency_chips(entry.get("weekly"), "W") +
+                 _rrg_recency_chips(entry.get("monthly"), "M"))
+        chips_html = f'<div class="tile-chips">{chips}</div>' if chips else ""
+        h += (f'<div class="tile" style="background:{bg};">'
+              f'<div class="tile-ticker">{t}</div>'
+              f'<div class="tile-phase" style="color:{phase_color}">{phase}</div>'
+              f'{chips_html}</div>')
+    h += '</div>'
+    return h
+
+
 def gen_rotation_tiles(rotation_data):
     h = ""
     for group_name, tickers in SECTOR_ROTATION_GROUPS.items():
         cls = "theme-group macro" if group_name == "Macro Context" else "theme-group"
-        h += f'<div class="{cls}"><div class="theme-heading">{group_name}</div><div class="tile-row">'
-        for t in tickers:
-            entry = rotation_data.get(t)
-            if not entry:
-                h += '<div></div>'
-                continue
-            bg = _tile_background(entry["rs_ratio"])
-            phase = entry["phase"]
-            phase_color = ROTATION_PHASE_COLOR_VARS[phase]
-            chips = (_rrg_recency_chips(entry.get("daily"), "D") +
-                     _rrg_recency_chips(entry.get("weekly"), "W") +
-                     _rrg_recency_chips(entry.get("monthly"), "M"))
-            chips_html = f'<div class="tile-chips">{chips}</div>' if chips else ""
-            h += (f'<div class="tile" style="background:{bg};">'
-                  f'<div class="tile-ticker">{t}</div>'
-                  f'<div class="tile-phase" style="color:{phase_color}">{phase}</div>'
-                  f'{chips_html}</div>')
-        h += '</div></div>'
+        h += f'<div class="{cls}"><div class="theme-heading">{group_name}</div>{gen_tile_row(rotation_data, tickers)}</div>'
     return h
+
 
 
 
@@ -892,25 +899,6 @@ def get_fear_and_greed():
             
         return score, prev, datetime.utcnow().strftime("%Y-%m-%d")
     except: return "N/A", "N/A", "N/A"
-
-def plot_fear_greed_history():
-    try:
-        df = pd.read_csv("fear_and_greed_history.csv")
-        df['Date'] = pd.to_datetime(df['Date'])
-        df = df.sort_values('Date').tail(90) # Last 90 days
-        
-        plt.figure(figsize=(10, 5))
-        plt.plot(df['Date'], df['Index'], color='#333', linewidth=2)
-        
-        # FORCE 0-100 SCALE
-        plt.ylim(0, 100)
-        
-        plt.title("Fear & Greed Index (Last 90 Days)")
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.savefig("docs/fg_trend.png")
-        plt.close()
-    except: pass
 
 # ==========================================
 # 5. HTML GENERATION
@@ -1064,6 +1052,7 @@ def get_shared_style(fg_color):
         .regime-row { display: flex; align-items: center; gap: 14px; margin: 10px 0; flex-wrap: wrap; }
         .regime-label { font-family: var(--font-mono); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); width: 90px; flex-shrink: 0; }
         .regime-value { font-family: var(--font-mono); font-weight: 600; }
+        .regime-row .tile-row { flex: 1; min-width: 260px; }
         .breadth-bar { flex: 1; min-width: 140px; height: 10px; border-radius: 5px; overflow: hidden; display: flex; background: var(--border-color); }
         .breadth-bull-seg { background-color: var(--bull); height: 100%; }
         .breadth-bear-seg { background-color: var(--bear); height: 100%; }
@@ -1097,7 +1086,6 @@ def get_shared_style(fg_color):
             body { margin: 10px; }
             table { width: 100% !important; }
             html { -webkit-text-size-adjust: none; text-size-adjust: none; }
-            .fg-chart { display: none !important; }
             th, td, a { font-size: 14px !important; line-height: 1.4; padding: 8px 8px; }
             td:nth-child(4) { white-space: normal; overflow-wrap: break-word; word-wrap: break-word; min-width: 60px; }
             .market-banner { font-size: 0.68em; padding: 3px 7px; }
@@ -1258,6 +1246,7 @@ def gen_setup_cards(setups, direction):
     return cards
 
 def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_setups, date_str, rotation_data=None):
+    rotation_data = rotation_data or {}
     f_val, f_prev, f_date = fg
     f_col = "#dc3545" if isinstance(f_val, int) and f_val >= 60 else "#ffc107" if isinstance(f_val, int) and f_val >= 45 else "#28a745"
     style = get_shared_style(f_col)
@@ -1309,7 +1298,10 @@ def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_
             <div class="breadth-bar"><div class="breadth-bull-seg" style="width:{bull_pct}%;"></div><div class="breadth-bear-seg" style="width:{100-bull_pct}%;"></div></div>
             <span class="breadth-count">{d_bot} bottoms / {d_top} tops (daily)</span>
         </div>
-        <img src="fg_trend.png" class="fg-chart" style="max-width: 420px; display:block; margin:10px 0 0 0; border-radius:4px;">
+        <div class="regime-row" style="margin-top:4px;">
+            <span class="regime-label">Macro</span>
+            {gen_tile_row(rotation_data, SECTOR_ROTATION_GROUPS.get("Macro Context", []))}
+        </div>
     </div>
 
     <div class="setups-heading">Top Setups</div>
@@ -1383,7 +1375,6 @@ def write_reports(daily, weekly, monthly, d_sec, w_sec, m_sec, fg, wyckoff, top_
     with open("docs/wyckoff.html", "w", encoding="utf-8") as f: f.write(html_w)
 
     # --- ROTATION HTML ---
-    rotation_data = rotation_data or {}
     n_scanned = len(rotation_data)
     n_total = len(SECTOR_ROTATION_TICKERS)
     tiles_html = gen_rotation_tiles(rotation_data)
@@ -1422,9 +1413,6 @@ def main():
     all_scores = build_confluence_scores(maps, inds, wyckoff, top_n=None)
     top_setups = all_scores[:15]
     fg = get_fear_and_greed()
-    
-    # Generate Graph
-    plot_fear_greed_history()
 
     # Signal log: append today's scored tickers, then backfill forward
     # returns for any older rows that just reached a 5/20/60-day horizon.
