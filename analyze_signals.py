@@ -60,10 +60,15 @@ def adjusted_returns(df):
 
 
 def score_bucket(score):
-    if score < 3: return "0-3 (weak)"
-    if score < 6: return "3-6 (moderate)"
-    if score < 9: return "6-9 (strong)"
-    return "9-12 (max confluence)"
+    # Boundaries rescaled to match CONF_SCORE_BAR_MAX=17.4 (bumped from 12.0
+    # when monthly signals were added a 4th stackable bull component) --
+    # the old "9-12 (max confluence)" label was stale: 12 hasn't been the
+    # real ceiling for a while, and would silently compress genuinely
+    # maxed-out setups into a bucket that understates how strong they are.
+    if score < 4: return "0-4 (weak)"
+    if score < 8: return "4-8 (moderate)"
+    if score < 12: return "8-12 (strong)"
+    return "12+ (max confluence)"
 
 
 def summarize(df, group_col):
