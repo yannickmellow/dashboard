@@ -734,62 +734,73 @@ ROTATION_GROUP_COLORS = {
     "Energy, Materials & Crypto": "255,140,102",
 }
 ROTATION_PHASE_COLOR_VARS = {"Leading": "var(--bull)", "Improving": "var(--amber)", "Weakening": "var(--bear)", "Lagging": "var(--bear)"}
-_ROTATION_UNIT_SUFFIX = {"D": "d", "W": "w", "M": "mo"}
+_ROTATION_UNIT_SUFFIX = {"D": "d", "W": "w", "M": "m"}
+_ROTATION_LOOKBACK = {"D": CONF_DAILY_LOOKBACK, "W": CONF_WEEKLY_LOOKBACK, "M": CONF_MONTHLY_LOOKBACK}
 
 
 def _rrg_recency_chips(recency, prefix):
     """Compact chip(s) for one timeframe's recency dict, e.g. 'W DM9 · today'
     -- at most one bull + one bear chip, preferring DM13 over DM9 per
-    direction (same priority as confluence scoring)."""
+    direction (same priority as confluence scoring). Opacity fades with
+    age using the same _decay() curve confluence scoring already uses
+    (1.0 at today, down to 0.5 at the edge of the lookback window), so a
+    fresh trigger visually reads as more relevant than a stale one near
+    the edge of its window, without hiding the older one outright."""
     if not recency:
         return ""
     unit = _ROTATION_UNIT_SUFFIX[prefix]
+    lookback = _ROTATION_LOOKBACK[prefix]
     def fmt(days): return "today" if days == 0 else f"{days}{unit} ago"
+    def op(days): return round(_decay(days, lookback), 2)
     chips = ""
     if recency.get("bot13") is not None:
-        chips += f'<span class="mini-chip mini-bull">{prefix} DM13 · {fmt(recency["bot13"])}</span>'
+        d = recency["bot13"]; chips += f'<span class="mini-chip mini-bull" style="opacity:{op(d)}">{prefix} DM13 · {fmt(d)}</span>'
     elif recency.get("bot9") is not None:
-        chips += f'<span class="mini-chip mini-bull">{prefix} DM9 · {fmt(recency["bot9"])}</span>'
+        d = recency["bot9"]; chips += f'<span class="mini-chip mini-bull" style="opacity:{op(d)}">{prefix} DM9 · {fmt(d)}</span>'
     if recency.get("top13") is not None:
-        chips += f'<span class="mini-chip mini-bear">{prefix} DM13 · {fmt(recency["top13"])}</span>'
+        d = recency["top13"]; chips += f'<span class="mini-chip mini-bear" style="opacity:{op(d)}">{prefix} DM13 · {fmt(d)}</span>'
     elif recency.get("top9") is not None:
-        chips += f'<span class="mini-chip mini-bear">{prefix} DM9 · {fmt(recency["top9"])}</span>'
+        d = recency["top9"]; chips += f'<span class="mini-chip mini-bear" style="opacity:{op(d)}">{prefix} DM9 · {fmt(d)}</span>'
     return chips
 
 
-def _tile_opacity(rs_ratio):
-    """Map RS-Ratio to a tile background opacity: further from 100 (in
-    either direction) = more saturated fill. Clamped so outliers don't
-    wash out to solid; the phase badge (not the tile shade) carries the
-    directional Leading/Lagging meaning."""
+def _tile_background(rs_ratio):
+    """Single, consistent strength scale for EVERY tile regardless of group
+    -- a standard green/red market-heatmap convention, intensity scaled by
+    how far RS-Ratio sits from neutral (100). Previously used a distinct
+    hue per group, but the group is already conveyed by which section the
+    tile sits in, so that was redundant and (per real usage) confusing --
+    this is the single thing tile shade now means."""
     strength = max(0, min(1, abs(rs_ratio - 100) / 30))
-    return round(0.03 + strength * 0.27, 3)
+    opacity = round(0.04 + strength * 0.26, 3)
+    color = "61,220,132" if rs_ratio >= 100 else "255,92,92"  # --bull / --bear
+    return f"rgba({color},{opacity})"
 
 
 def gen_rotation_tiles(rotation_data):
     h = ""
     for group_name, tickers in SECTOR_ROTATION_GROUPS.items():
-        color = ROTATION_GROUP_COLORS.get(group_name, "139,149,161")
         cls = "theme-group macro" if group_name == "Macro Context" else "theme-group"
-        h += f'<div class="{cls}"><div class="theme-heading"><span>{group_name}</span><span class="theme-count">{len(tickers)}</span></div><div class="tile-row">'
+        h += f'<div class="{cls}"><div class="theme-heading">{group_name}</div><div class="tile-row">'
         for t in tickers:
             entry = rotation_data.get(t)
             if not entry:
                 h += '<div></div>'
                 continue
-            opacity = _tile_opacity(entry["rs_ratio"])
+            bg = _tile_background(entry["rs_ratio"])
             phase = entry["phase"]
             phase_color = ROTATION_PHASE_COLOR_VARS[phase]
             chips = (_rrg_recency_chips(entry.get("daily"), "D") +
                      _rrg_recency_chips(entry.get("weekly"), "W") +
                      _rrg_recency_chips(entry.get("monthly"), "M"))
             chips_html = f'<div class="tile-chips">{chips}</div>' if chips else ""
-            h += (f'<div class="tile" style="background:rgba({color},{opacity});">'
+            h += (f'<div class="tile" style="background:{bg};">'
                   f'<div class="tile-ticker">{t}</div>'
                   f'<div class="tile-phase" style="color:{phase_color}">{phase}</div>'
                   f'{chips_html}</div>')
         h += '</div></div>'
     return h
+
 
 
 def gen_rrg_svg(rotation_data):
@@ -996,10 +1007,9 @@ def get_shared_style(fg_color):
         .theme-group { margin-bottom: 16px; }
         .theme-group:last-child { margin-bottom: 0; }
         .theme-group.macro { border-bottom: 1px dashed var(--border-color); padding-bottom: 14px; margin-bottom: 22px; }
-        .theme-heading { font-family: var(--font-mono); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between; }
-        .theme-count { opacity: 0.6; }
-        .tile-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
-        .tile { border-radius: 6px; padding: 8px 9px; border: 1px solid var(--border-color); min-height: 54px; }
+        .theme-heading { font-family: var(--font-mono); font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 6px; }
+        .tile-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(122px, 1fr)); gap: 8px; }
+        .tile { border-radius: 6px; padding: 9px 10px; border: 1px solid var(--border-color); min-height: 58px; }
         .tile-ticker { font-family: var(--font-mono); font-weight: 500; font-size: 0.95em; }
         .tile-phase { font-family: var(--font-mono); font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.85; margin-top: 2px; }
         .tile-chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
