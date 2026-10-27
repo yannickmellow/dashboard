@@ -19485,7 +19485,7 @@ date,ticker,direction,price_at_trigger,sector,industry,raw_score,price_multiplie
 2026-09-28,TECK,Bearish,65.16000366210938,Basic Materials,Other Industrial Metals & Mining,2.5,1.0,2.5,"[[""Monthly DM13 Top"", 1, 2.5]]",4.16,,
 2026-09-28,MCK,Bearish,856.2899780273438,Healthcare,Medical Distribution,2.5,1.0,2.5,"[[""Weekly DM13 Top"", 2, 2.5]]",6.91,,
 2026-09-28,ON,Bullish,75.6500015258789,Technology,Semiconductors,2.5,1.0,2.5,"[[""Weekly DM13 Bottom"", 2, 2.5]]",13.59,,
-2026-09-28,CNO,Bearish,53.63999938964844,Financial,Insurance - Life,2.5,1.0,2.5,"[[""Monthly DM13 Top"", 1, 2.5]]",0.73,,
+2026-09-28,CNO,Bearish,53.63999938964844,Financial,Insurance - Life,2.5,1.0,2.5,"[[""Monthly DM13 Top"", 1, 2.5]]",0.73,1.04,
 2026-09-28,VERI,Bullish,1.2799999713897705,Technology,Software - Infrastructure,2.0,1.2,2.4,"[[""Monthly DM9 Bottom"", 0, 2.0]]",-43.28,,
 2026-09-28,RR,Bullish,1.5700000524520874,Industrials,Specialty Industrial Machinery,2.0,1.2,2.4,"[[""Monthly DM9 Bottom"", 0, 2.0]]",9.55,,
 2026-09-28,RSI,Bullish,19.549999237060547,Consumer Cyclical,Gambling,2.0,1.2,2.4,"[[""Daily DM13 Bottom"", 0, 2.0]]",7.37,,
